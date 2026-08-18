@@ -1,0 +1,6 @@
+{
+  "name": "Bpexch Wallet",
+  "description": "Bpexch Wallet application with login, deposit, withdrawal, and BetPro Exchange integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
