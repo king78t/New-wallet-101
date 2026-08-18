@@ -6,6 +6,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -14,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -21,6 +28,7 @@ import com.example.ui.MainViewModel
 import com.example.ui.screens.AdminSuperPanelScreen
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.BetProWebViewScreen
+import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.SplashScreen
 import com.example.ui.screens.UserDashboardScreen
 import com.example.ui.theme.BPWalletTheme
@@ -36,7 +44,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             BPWalletTheme {
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    awaitPointerEvent()
+                                    viewModel.onUserInteraction()
+                                }
+                            }
+                        },
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val toastMsg by viewModel.toastMessage.collectAsState()
@@ -58,10 +75,44 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavigation(viewModel: MainViewModel) {
     val navController = rememberNavController()
+    val isSessionExpired by viewModel.isSessionExpired.collectAsState()
+
+    LaunchedEffect(isSessionExpired) {
+        if (isSessionExpired) {
+            navController.navigate("auth") {
+                popUpTo(0) { inclusive = true }
+            }
+            viewModel.resetSessionExpiredFlag()
+        }
+    }
 
     NavHost(
         navController = navController,
-        startDestination = "splash"
+        startDestination = "splash",
+        enterTransition = {
+            slideInHorizontally(
+                initialOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+            ) + fadeIn(animationSpec = tween(durationMillis = 300))
+        },
+        exitTransition = {
+            slideOutHorizontally(
+                targetOffsetX = { fullWidth -> -fullWidth },
+                animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+            ) + fadeOut(animationSpec = tween(durationMillis = 300))
+        },
+        popEnterTransition = {
+            slideInHorizontally(
+                initialOffsetX = { fullWidth -> -fullWidth },
+                animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+            ) + fadeIn(animationSpec = tween(durationMillis = 300))
+        },
+        popExitTransition = {
+            slideOutHorizontally(
+                targetOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+            ) + fadeOut(animationSpec = tween(durationMillis = 300))
+        }
     ) {
         composable("splash") {
             SplashScreen(
@@ -94,6 +145,24 @@ fun AppNavigation(viewModel: MainViewModel) {
                 viewModel = viewModel,
                 onOpenBetProExchange = {
                     navController.navigate("betpro_webview")
+                },
+                onOpenProfile = {
+                    navController.navigate("profile")
+                },
+                onLogout = {
+                    viewModel.logout()
+                    navController.navigate("auth") {
+                        popUpTo("user_dashboard") { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable("profile") {
+            ProfileScreen(
+                viewModel = viewModel,
+                onBack = {
+                    navController.popBackStack()
                 },
                 onLogout = {
                     viewModel.logout()

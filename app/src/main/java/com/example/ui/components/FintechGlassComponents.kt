@@ -250,29 +250,29 @@ fun FintechLogoHeader(
     ) {
         Box(
             modifier = Modifier
-                .size(64.dp)
+                .size(68.dp)
                 .shadow(
-                    elevation = 6.dp,
-                    shape = RoundedCornerShape(16.dp),
+                    elevation = 8.dp,
+                    shape = CircleShape,
                     ambientColor = if (isAdminMode) Color(0x30F59E0B) else Color(0x3010B981),
                     spotColor = if (isAdminMode) Color(0x20F59E0B) else Color(0x2010B981)
                 )
-                .clip(RoundedCornerShape(16.dp))
+                .clip(CircleShape)
                 .background(Color.White)
                 .border(
-                    width = 1.dp,
+                    width = 2.dp,
                     color = if (isAdminMode) Color(0xFFFDE68A) else Color(0xFFA7F3D0),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
         ) {
             Image(
                 painter = painterResource(id = com.example.R.drawable.bp_wallet_icon_1786476389724),
                 contentDescription = "BP Wallet Logo",
-                contentScale = ContentScale.Fit,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(6.dp)
+                    .clip(CircleShape)
             )
         }
 

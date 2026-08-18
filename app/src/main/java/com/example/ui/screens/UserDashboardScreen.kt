@@ -61,8 +61,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.data.supabase.PaymentGatewayDto
-import com.example.data.supabase.TransactionDto
+import com.example.data.models.PaymentGatewayDto
+import com.example.data.models.TransactionDto
 import com.example.ui.MainViewModel
 import com.example.ui.components.AnimatedGlassBackground
 
@@ -70,6 +70,7 @@ import com.example.ui.components.AnimatedGlassBackground
 fun UserDashboardScreen(
     viewModel: MainViewModel,
     onOpenBetProExchange: () -> Unit,
+    onOpenProfile: () -> Unit = {},
     onLogout: () -> Unit
 ) {
     val userSession by viewModel.currentUser.collectAsState()
@@ -101,7 +102,13 @@ fun UserDashboardScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onOpenProfile() }
+                        .padding(vertical = 4.dp, horizontal = 4.dp)
+                ) {
                     Box(
                         modifier = Modifier
                             .size(42.dp)

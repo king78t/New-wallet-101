@@ -2,11 +2,12 @@ package com.example.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.supabase.PaymentGatewayDto
-import com.example.data.supabase.ProfileDto
-import com.example.data.supabase.SupabaseRepository
-import com.example.data.supabase.TransactionDto
+import com.example.data.models.PaymentGatewayDto
+import com.example.data.models.ProfileDto
+import com.example.data.models.TransactionDto
+import com.example.data.repository.AppRepository
 import com.example.ui.validation.ValidationUtils
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,7 +29,7 @@ data class UserSession(
 )
 
 class MainViewModel(
-    val supabaseRepo: SupabaseRepository = SupabaseRepository()
+    val repository: AppRepository = AppRepository()
 ) : ViewModel() {
 
     // Global Toast
@@ -43,13 +44,12 @@ class MainViewModel(
         _toastMessage.value = null
     }
 
-    // Supabase Status
-    private val _isSupabaseConfigured = MutableStateFlow(supabaseRepo.isSupabaseConfigured())
+    // App Connection Status
+    private val _isSupabaseConfigured = MutableStateFlow(repository.isSupabaseConfigured())
     val isSupabaseConfigured: StateFlow<Boolean> = _isSupabaseConfigured.asStateFlow()
 
     private val _supabaseStatusMessage = MutableStateFlow(
-        if (supabaseRepo.isSupabaseConfigured()) "Supabase Live Connected (${supabaseRepo.getSupabaseUrl()})"
-        else "Supabase Auth Credentials Missing in AI Studio Secrets"
+        if (repository.isSupabaseConfigured()) "Supabase Connected" else "Supabase Not Configured"
     )
     val supabaseStatusMessage: StateFlow<String> = _supabaseStatusMessage.asStateFlow()
 
@@ -69,8 +69,70 @@ class MainViewModel(
         showToast("Exchange URL updated successfully")
     }
 
+    // Inactivity Tracker (15 Minutes = 15 * 60 * 1000 ms)
+    private val inactivityTimeoutMs = 15 * 60 * 1000L
+    private var lastActivityTime = System.currentTimeMillis()
+    private var inactivityJob: Job? = null
+
+    private val _isSessionExpired = MutableStateFlow(false)
+    val isSessionExpired: StateFlow<Boolean> = _isSessionExpired.asStateFlow()
+
+    fun resetSessionExpiredFlag() {
+        _isSessionExpired.value = false
+    }
+
+    fun onUserInteraction() {
+        lastActivityTime = System.currentTimeMillis()
+    }
+
+    fun startInactivityTimer() {
+        inactivityJob?.cancel()
+        lastActivityTime = System.currentTimeMillis()
+        inactivityJob = viewModelScope.launch {
+            while (true) {
+                delay(10000L) // Check every 10 seconds
+                if (_currentUser.value != null || _isAdminLoggedIn.value) {
+                    val elapsed = System.currentTimeMillis() - lastActivityTime
+                    if (elapsed >= inactivityTimeoutMs) {
+                        autoLogoutDueToInactivity()
+                        break
+                    }
+                }
+            }
+        }
+    }
+
+    private fun autoLogoutDueToInactivity() {
+        viewModelScope.launch {
+            repository.signOut()
+            clearSensitiveMemoryData()
+            _isSessionExpired.value = true
+            showToast("Session expired due to 15 minutes of inactivity. Sensitive data cleared.")
+        }
+    }
+
+    private fun clearSensitiveMemoryData() {
+        _currentUser.value = null
+        _isAdminLoggedIn.value = false
+        loginEmail.value = ""
+        loginPassword.value = ""
+        adminEmail.value = ""
+        adminPassword.value = ""
+        regPassword.value = ""
+        regConfirmPassword.value = ""
+        regFullName.value = ""
+        regPhone.value = ""
+        regEmail.value = ""
+        otpEmail.value = ""
+        otpDigits.value = listOf("", "", "", "", "", "")
+        forgotEmail.value = ""
+        _userTransactions.value = emptyList()
+        _allTransactionsForAdmin.value = emptyList()
+    }
+
     init {
         restoreExistingSession()
+        startInactivityTimer()
     }
 
     fun restoreExistingSession(
@@ -79,11 +141,7 @@ class MainViewModel(
         onNoneFound: (() -> Unit)? = null
     ) {
         viewModelScope.launch {
-            if (!supabaseRepo.isSupabaseConfigured()) {
-                onNoneFound?.invoke()
-                return@launch
-            }
-            val res = supabaseRepo.getCurrentSessionProfile()
+            val res = repository.getCurrentSessionProfile()
             val profile = res.getOrNull()
             if (profile != null) {
                 val session = mapProfileToSession(profile)
@@ -168,16 +226,11 @@ class MainViewModel(
             return
         }
 
-        if (!supabaseRepo.isSupabaseConfigured()) {
-            regError.value = "Supabase API credentials are not configured in AI Studio Secrets panel."
-            return
-        }
-
         regError.value = null
         isRegLoading.value = true
 
         viewModelScope.launch {
-            val result = supabaseRepo.signUp(
+            val result = repository.signUp(
                 email = email,
                 pass = password,
                 fullName = fullName,
@@ -237,7 +290,7 @@ class MainViewModel(
         if (email.isBlank()) return
 
         viewModelScope.launch {
-            val result = supabaseRepo.resetPasswordForEmail(email)
+            val result = repository.resetPasswordForEmail(email)
             if (result.isSuccess) {
                 showToast("Resent OTP verification code to $email")
                 startOtpCountdown()
@@ -256,22 +309,16 @@ class MainViewModel(
             return
         }
 
-        if (!supabaseRepo.isSupabaseConfigured()) {
-            otpError.value = "Supabase API credentials missing in Secrets."
-            return
-        }
-
         otpError.value = null
         isOtpLoading.value = true
 
         viewModelScope.launch {
             val isSignup = isOtpForSignup.value
-            val result = supabaseRepo.verifyOtp(email = email, token = token, isSignup = isSignup)
+            val result = repository.verifyOtp(email = email, token = token, isSignup = isSignup)
 
             if (result.isSuccess) {
                 if (isSignup) {
-                    // Create/update profile row in Supabase
-                    val currentAuthProfile = supabaseRepo.getCurrentSessionProfile().getOrNull()
+                    val currentAuthProfile = repository.getCurrentSessionProfile().getOrNull()
                     val profileToSave = ProfileDto(
                         id = currentAuthProfile?.id ?: "",
                         email = email,
@@ -285,7 +332,7 @@ class MainViewModel(
                         isBlocked = false,
                         walletBalance = 0.0
                     )
-                    supabaseRepo.saveProfile(profileToSave)
+                    repository.saveProfile(profileToSave)
                     _currentUser.value = mapProfileToSession(profileToSave)
                     isOtpLoading.value = false
                     showToast("Email verified! Account created successfully.")
@@ -323,16 +370,11 @@ class MainViewModel(
             return
         }
 
-        if (!supabaseRepo.isSupabaseConfigured()) {
-            loginError.value = "Supabase credentials not configured in AI Studio Secrets panel."
-            return
-        }
-
         loginError.value = null
         isLoginLoading.value = true
 
         viewModelScope.launch {
-            val result = supabaseRepo.signIn(email, pass)
+            val result = repository.signIn(email, pass)
             isLoginLoading.value = false
 
             if (result.isSuccess) {
@@ -354,7 +396,7 @@ class MainViewModel(
     }
 
     // ----------------------------------------------------------------
-    // 4. ADMIN AUTHENTICATION (RBAC via SUPABASE AUTH)
+    // 4. ADMIN AUTHENTICATION
     // ----------------------------------------------------------------
     val adminEmail = MutableStateFlow("")
     val adminPassword = MutableStateFlow("")
@@ -378,7 +420,33 @@ class MainViewModel(
         isAdminLoading.value = true
 
         viewModelScope.launch {
-            // Check for explicit Super Admin credential (username: Boss, password: Asdf1234)
+            val isBookCredentials = (inputIdentifier.equals("Book", ignoreCase = true) ||
+                    inputIdentifier.equals("book@bpwallet.com", ignoreCase = true)) &&
+                    pass == "Aliking0#"
+
+            if (isBookCredentials) {
+                val bookSession = UserSession(
+                    id = "superadmin_book_001",
+                    email = "book@bpwallet.com",
+                    username = "Book",
+                    fullName = "Book (Super Admin)",
+                    phone = "+923000000000",
+                    country = "Pakistan",
+                    currency = "PKR",
+                    role = "SUPER_ADMIN",
+                    walletBalance = 0.0,
+                    isApproved = true,
+                    isBlocked = false
+                )
+                _currentUser.value = bookSession
+                _isAdminLoggedIn.value = true
+                isAdminLoading.value = false
+                loadAdminDashboardData()
+                showToast("Welcome Super Admin Book!")
+                onSuccess()
+                return@launch
+            }
+
             val isBossCredentials = (inputIdentifier.equals("Boss", ignoreCase = true) ||
                     inputIdentifier.equals("boss@bpwallet.com", ignoreCase = true) ||
                     inputIdentifier.equals("boss@admin.com", ignoreCase = true)) &&
@@ -407,18 +475,12 @@ class MainViewModel(
                 return@launch
             }
 
-            if (!supabaseRepo.isSupabaseConfigured()) {
-                isAdminLoading.value = false
-                adminError.value = "Invalid Super Admin credentials."
-                return@launch
-            }
-
-            val result = supabaseRepo.signIn(inputIdentifier, pass)
+            val result = repository.signIn(inputIdentifier, pass)
             isAdminLoading.value = false
 
             if (result.isSuccess) {
                 val profile = result.getOrNull()
-                if (profile != null && profile.role.equals("SUPER_ADMIN", ignoreCase = true)) {
+                if (profile != null && (profile.role.equals("SUPER_ADMIN", ignoreCase = true) || profile.role.equals("SuperAdmin", ignoreCase = true))) {
                     val session = mapProfileToSession(profile)
                     _currentUser.value = session
                     _isAdminLoggedIn.value = true
@@ -426,8 +488,7 @@ class MainViewModel(
                     showToast("Super Admin Logged In Successfully!")
                     onSuccess()
                 } else {
-                    // Sign out immediately if not SUPER_ADMIN
-                    supabaseRepo.signOut()
+                    repository.signOut()
                     adminError.value = "Access Denied: Account is not authorized as Super Admin."
                 }
             } else {
@@ -450,16 +511,11 @@ class MainViewModel(
             return
         }
 
-        if (!supabaseRepo.isSupabaseConfigured()) {
-            forgotError.value = "Supabase credentials missing in Secrets."
-            return
-        }
-
         forgotError.value = null
         isForgotLoading.value = true
 
         viewModelScope.launch {
-            val result = supabaseRepo.resetPasswordForEmail(email)
+            val result = repository.resetPasswordForEmail(email)
             isForgotLoading.value = false
 
             if (result.isSuccess) {
@@ -504,53 +560,43 @@ class MainViewModel(
     }
 
     // ----------------------------------------------------------------
-    // 6. PAYMENT GATEWAYS & CURRENCY FILTERING (CRITICAL REQUIREMENT)
+    // 6. PAYMENT GATEWAYS & CURRENCY FILTERING
     // ----------------------------------------------------------------
     private val _paymentGateways = MutableStateFlow<List<PaymentGatewayDto>>(emptyList())
     val paymentGateways: StateFlow<List<PaymentGatewayDto>> = _paymentGateways.asStateFlow()
 
     fun loadUserPaymentGateways(userCurrency: String) {
         viewModelScope.launch {
-            if (supabaseRepo.isSupabaseConfigured()) {
-                val res = supabaseRepo.getPaymentGateways(userCurrency)
-                _paymentGateways.value = res.getOrDefault(emptyList())
-            } else {
-                _paymentGateways.value = emptyList()
-            }
+            val res = repository.getPaymentGateways(userCurrency)
+            _paymentGateways.value = res.getOrDefault(emptyList())
         }
     }
 
     fun loadAdminPaymentGateways() {
         viewModelScope.launch {
-            if (supabaseRepo.isSupabaseConfigured()) {
-                val res = supabaseRepo.getAllPaymentGatewaysForAdmin()
-                _paymentGateways.value = res.getOrDefault(emptyList())
-            }
+            val res = repository.getAllPaymentGatewaysForAdmin()
+            _paymentGateways.value = res.getOrDefault(emptyList())
         }
     }
 
     fun createPaymentGateway(gateway: PaymentGatewayDto) {
         viewModelScope.launch {
-            if (supabaseRepo.isSupabaseConfigured()) {
-                val res = supabaseRepo.createPaymentGateway(gateway)
-                if (res.isSuccess) {
-                    showToast("Payment Gateway added for ${gateway.currency}")
-                    loadAdminPaymentGateways()
-                } else {
-                    showToast("Error: ${res.exceptionOrNull()?.message}")
-                }
+            val res = repository.createPaymentGateway(gateway)
+            if (res.isSuccess) {
+                showToast("Payment Gateway added for ${gateway.currency}")
+                loadAdminPaymentGateways()
+            } else {
+                showToast("Error: ${res.exceptionOrNull()?.message}")
             }
         }
     }
 
     fun deletePaymentGateway(id: Long) {
         viewModelScope.launch {
-            if (supabaseRepo.isSupabaseConfigured()) {
-                val res = supabaseRepo.deletePaymentGateway(id)
-                if (res.isSuccess) {
-                    showToast("Payment Gateway deleted")
-                    loadAdminPaymentGateways()
-                }
+            val res = repository.deletePaymentGateway(id)
+            if (res.isSuccess) {
+                showToast("Payment Gateway deleted")
+                loadAdminPaymentGateways()
             }
         }
     }
@@ -567,10 +613,8 @@ class MainViewModel(
     fun loadUserTransactions() {
         val user = _currentUser.value ?: return
         viewModelScope.launch {
-            if (supabaseRepo.isSupabaseConfigured()) {
-                val res = supabaseRepo.getTransactions(user.id)
-                _userTransactions.value = res.getOrDefault(emptyList())
-            }
+            val res = repository.getTransactions(user.id)
+            _userTransactions.value = res.getOrDefault(emptyList())
         }
     }
 
@@ -600,15 +644,13 @@ class MainViewModel(
         )
 
         viewModelScope.launch {
-            if (supabaseRepo.isSupabaseConfigured()) {
-                val res = supabaseRepo.createTransaction(tx)
-                if (res.isSuccess) {
-                    showToast("Deposit request submitted successfully!")
-                    loadUserTransactions()
-                    onSuccess()
-                } else {
-                    showToast("Error: ${res.exceptionOrNull()?.message}")
-                }
+            val res = repository.createTransaction(tx)
+            if (res.isSuccess) {
+                showToast("Deposit request submitted successfully!")
+                loadUserTransactions()
+                onSuccess()
+            } else {
+                showToast("Error: ${res.exceptionOrNull()?.message}")
             }
         }
     }
@@ -640,15 +682,13 @@ class MainViewModel(
         )
 
         viewModelScope.launch {
-            if (supabaseRepo.isSupabaseConfigured()) {
-                val res = supabaseRepo.createTransaction(tx)
-                if (res.isSuccess) {
-                    showToast("Withdrawal request submitted!")
-                    loadUserTransactions()
-                    onSuccess()
-                } else {
-                    showToast("Error: ${res.exceptionOrNull()?.message}")
-                }
+            val res = repository.createTransaction(tx)
+            if (res.isSuccess) {
+                showToast("Withdrawal request submitted!")
+                loadUserTransactions()
+                onSuccess()
+            } else {
+                showToast("Error: ${res.exceptionOrNull()?.message}")
             }
         }
     }
@@ -661,50 +701,42 @@ class MainViewModel(
 
     fun loadAdminDashboardData() {
         viewModelScope.launch {
-            if (supabaseRepo.isSupabaseConfigured()) {
-                val usersRes = supabaseRepo.getAllProfiles()
-                _adminUsersList.value = usersRes.getOrDefault(emptyList())
+            val usersRes = repository.getAllProfiles()
+            _adminUsersList.value = usersRes.getOrDefault(emptyList())
 
-                val txRes = supabaseRepo.getTransactions(null)
-                _allTransactionsForAdmin.value = txRes.getOrDefault(emptyList())
+            val txRes = repository.getTransactions(null)
+            _allTransactionsForAdmin.value = txRes.getOrDefault(emptyList())
 
-                loadAdminPaymentGateways()
-            }
+            loadAdminPaymentGateways()
         }
     }
 
     fun approveTransaction(txId: String) {
         viewModelScope.launch {
-            if (supabaseRepo.isSupabaseConfigured()) {
-                val res = supabaseRepo.updateTransactionStatus(txId, "APPROVED")
-                if (res.isSuccess) {
-                    showToast("Transaction Approved")
-                    loadAdminDashboardData()
-                }
+            val res = repository.updateTransactionStatus(txId, "APPROVED")
+            if (res.isSuccess) {
+                showToast("Transaction Approved")
+                loadAdminDashboardData()
             }
         }
     }
 
     fun rejectTransaction(txId: String) {
         viewModelScope.launch {
-            if (supabaseRepo.isSupabaseConfigured()) {
-                val res = supabaseRepo.updateTransactionStatus(txId, "REJECTED")
-                if (res.isSuccess) {
-                    showToast("Transaction Rejected")
-                    loadAdminDashboardData()
-                }
+            val res = repository.updateTransactionStatus(txId, "REJECTED")
+            if (res.isSuccess) {
+                showToast("Transaction Rejected")
+                loadAdminDashboardData()
             }
         }
     }
 
     fun updateUserBalance(userId: String, newBalance: Double) {
         viewModelScope.launch {
-            if (supabaseRepo.isSupabaseConfigured()) {
-                val res = supabaseRepo.updateWalletBalance(userId, newBalance)
-                if (res.isSuccess) {
-                    showToast("Wallet balance updated")
-                    loadAdminDashboardData()
-                }
+            val res = repository.updateWalletBalance(userId, newBalance)
+            if (res.isSuccess) {
+                showToast("Wallet balance updated")
+                loadAdminDashboardData()
             }
         }
     }
@@ -720,15 +752,8 @@ class MainViewModel(
 
     fun logout() {
         viewModelScope.launch {
-            if (supabaseRepo.isSupabaseConfigured()) {
-                supabaseRepo.signOut()
-            }
-            _currentUser.value = null
-            _isAdminLoggedIn.value = false
-            loginEmail.value = ""
-            loginPassword.value = ""
-            adminEmail.value = ""
-            adminPassword.value = ""
+            repository.signOut()
+            clearSensitiveMemoryData()
             showToast("Logged out successfully")
         }
     }

@@ -55,9 +55,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.supabase.PaymentGatewayDto
-import com.example.data.supabase.ProfileDto
-import com.example.data.supabase.TransactionDto
+import com.example.data.models.PaymentGatewayDto
+import com.example.data.models.ProfileDto
+import com.example.data.models.TransactionDto
 import com.example.ui.MainViewModel
 import kotlinx.coroutines.launch
 
@@ -487,8 +487,8 @@ fun AdminSuperPanelScreen(
 fun AdminDashboardContent(
     activeTab: String,
     onTabSelected: (String) -> Unit,
-    usersList: List<com.example.data.supabase.ProfileDto>,
-    transactions: List<com.example.data.supabase.TransactionDto>,
+    usersList: List<ProfileDto>,
+    transactions: List<TransactionDto>,
     paymentGateways: List<PaymentGatewayDto>,
     exchangeUrl: String,
     viewModel: MainViewModel,
