@@ -34,6 +34,32 @@ class AppRepository {
         }
     }
 
+    private fun parseAuthError(e: Throwable): String {
+        val msg = e.message ?: ""
+        return when {
+            msg.contains("already registered", ignoreCase = true) ||
+            msg.contains("User already registered", ignoreCase = true) ||
+            msg.contains("email_exists", ignoreCase = true) ||
+            msg.contains("duplicate key", ignoreCase = true) -> {
+                "An account with this email address already exists. Please log in instead."
+            }
+            msg.contains("password", ignoreCase = true) && (msg.contains("weak", ignoreCase = true) || msg.contains("short", ignoreCase = true) || msg.contains("least", ignoreCase = true)) -> {
+                "Password must be at least 6 characters long."
+            }
+            msg.contains("invalid email", ignoreCase = true) || msg.contains("invalid_email", ignoreCase = true) -> {
+                "Please enter a valid email address."
+            }
+            msg.contains("rate limit", ignoreCase = true) || msg.contains("over_email_send_rate_limit", ignoreCase = true) -> {
+                "Email rate limit exceeded. Please wait a moment before trying again."
+            }
+            msg.contains("Unable to resolve host", ignoreCase = true) || msg.contains("network", ignoreCase = true) || msg.contains("Failed to connect", ignoreCase = true) -> {
+                "Network connection error. Please check your internet connection."
+            }
+            msg.isBlank() -> "Authentication failed. Please check your details and try again."
+            else -> msg
+        }
+    }
+
     suspend fun signUp(
         email: String,
         pass: String,
@@ -45,52 +71,57 @@ class AppRepository {
     ): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             checkConfigured()
-            val client = SupabaseClientProvider.client ?: return@withContext Result.failure(Exception("Supabase client null"))
-            
-            client.auth.signUpWith(Email) {
-                this.email = email
-                this.password = pass
-            }
-            val userId = client.auth.currentUserOrNull()?.id ?: ("USR_" + System.currentTimeMillis().toString().takeLast(6))
+            val client = SupabaseClientProvider.client ?: return@withContext Result.failure(Exception("Supabase client is not available."))
 
+            val targetEmail = email.trim().lowercase()
+
+            // 1. Create Supabase Auth Account
+            try {
+                client.auth.signUpWith(Email) {
+                    this.email = targetEmail
+                    this.password = pass
+                }
+            } catch (authEx: Exception) {
+                val userFriendlyMsg = parseAuthError(authEx)
+                return@withContext Result.failure(Exception(userFriendlyMsg))
+            }
+
+            // 2. Obtain Authenticated User's UUID from Supabase Auth
+            val authUser = client.auth.currentUserOrNull()
+            val userId = authUser?.id ?: ("USR_" + System.currentTimeMillis().toString().takeLast(8))
+
+            // 3. Construct Profile DTO (Public signup is strictly role = "USER")
             val profile = ProfileDto(
                 id = userId,
-                email = email,
-                username = username.ifBlank { email.substringBefore("@") },
+                email = targetEmail,
+                username = username.ifBlank { targetEmail.substringBefore("@") },
                 fullName = fullName.ifBlank { "BP User" },
                 phone = phone,
                 country = country,
                 currency = currency,
-                role = "USER",
+                role = "USER", // STRICT: Normal public signup is always "USER"
                 walletBalance = 0.0,
                 isApproved = true,
                 isBlocked = false
             )
-            profilesMap[email.lowercase()] = profile
-            
+
+            // Save to local cache
+            profilesMap[targetEmail] = profile
+
+            // 4. Insert Profile Row into Supabase Postgrest 'profiles' table
             try {
                 client.postgrest["profiles"].upsert(profile)
-            } catch (_: Exception) {}
+            } catch (dbEx: Exception) {
+                // Return clear error if database profile creation fails
+                val dbMsg = dbEx.localizedMessage ?: "Failed to write profile record to database"
+                return@withContext Result.failure(Exception("Auth created, but profile database entry failed: $dbMsg"))
+            }
 
+            currentSessionUser = profile
             Result.success(true)
         } catch (e: Exception) {
-            // Local fallback if server table does not exist or network fails
-            val newId = "USR_" + System.currentTimeMillis().toString().takeLast(6)
-            val profile = ProfileDto(
-                id = newId,
-                email = email,
-                username = username.ifBlank { email.substringBefore("@") },
-                fullName = fullName.ifBlank { "BP User" },
-                phone = phone,
-                country = country,
-                currency = currency,
-                role = "USER",
-                walletBalance = 0.0,
-                isApproved = true,
-                isBlocked = false
-            )
-            profilesMap[email.lowercase()] = profile
-            Result.success(true)
+            val userFriendlyMsg = parseAuthError(e)
+            Result.failure(Exception(userFriendlyMsg))
         }
     }
 
@@ -99,6 +130,7 @@ class AppRepository {
         token: String,
         isSignup: Boolean = true
     ): Result<Boolean> = withContext(Dispatchers.IO) {
+        val targetEmail = email.trim().lowercase()
         try {
             checkConfigured()
             val client = SupabaseClientProvider.client
@@ -106,22 +138,39 @@ class AppRepository {
                 try {
                     client.auth.verifyEmailOtp(
                         type = if (isSignup) OtpType.Email.SIGNUP else OtpType.Email.EMAIL,
-                        email = email,
+                        email = targetEmail,
                         token = token
                     )
-                } catch (_: Exception) {}
+                } catch (otpEx: Exception) {
+                    val msg = parseAuthError(otpEx)
+                    return@withContext Result.failure(Exception(msg))
+                }
+
+                val user = client.auth.currentUserOrNull()
+                if (user != null) {
+                    try {
+                        val remoteProfile = client.postgrest["profiles"]
+                            .select { filter { eq("id", user.id) } }
+                            .decodeSingleOrNull<ProfileDto>()
+                        if (remoteProfile != null) {
+                            currentSessionUser = remoteProfile
+                            profilesMap[targetEmail] = remoteProfile
+                        }
+                    } catch (_: Exception) {}
+                }
+                return@withContext Result.success(true)
             }
         } catch (_: Exception) {}
 
-        val profile = profilesMap[email.lowercase()] ?: ProfileDto(
+        val profile = profilesMap[targetEmail] ?: ProfileDto(
             id = "USR_" + System.currentTimeMillis().toString().takeLast(6),
-            email = email,
-            username = email.substringBefore("@"),
+            email = targetEmail,
+            username = targetEmail.substringBefore("@"),
             fullName = "BP User",
             role = "USER",
             walletBalance = 0.0
         )
-        profilesMap[email.lowercase()] = profile
+        profilesMap[targetEmail] = profile
         currentSessionUser = profile
         Result.success(true)
     }
@@ -130,33 +179,7 @@ class AppRepository {
         val targetEmail = if (email.contains("@")) email.trim().lowercase() else if (email.trim().equals("Book", ignoreCase = true)) "book@bpwallet.com" else "${email.trim().lowercase()}@bpwallet.com"
         val inputKey = email.trim().lowercase()
 
-        try {
-            checkConfigured()
-            val client = SupabaseClientProvider.client
-            if (client != null) {
-                try {
-                    client.auth.signInWith(Email) {
-                        this.email = targetEmail
-                        this.password = pass
-                    }
-                } catch (_: Exception) {}
-
-                try {
-                    val remoteProfile = client.postgrest["profiles"]
-                        .select { filter { or { eq("email", targetEmail); eq("username", email.trim()) } } }
-                        .decodeSingleOrNull<ProfileDto>()
-                    if (remoteProfile != null) {
-                        profilesMap[targetEmail] = remoteProfile
-                        currentSessionUser = remoteProfile
-                        if (remoteProfile.isBlocked) {
-                            return@withContext Result.failure(Exception("Your account has been suspended by Super Admin."))
-                        }
-                        return@withContext Result.success(remoteProfile)
-                    }
-                } catch (_: Exception) {}
-            }
-        } catch (_: Exception) {}
-
+        // Reserved Emergency / Admin Access for Book
         if ((inputKey == "book" || targetEmail == "book@bpwallet.com") && pass == "Aliking0#") {
             val bookProfile = ProfileDto(
                 id = "superadmin_book_001",
@@ -177,20 +200,86 @@ class AppRepository {
             return@withContext Result.success(bookProfile)
         }
 
-        val profile = profilesMap[targetEmail] ?: profilesMap[inputKey] ?: ProfileDto(
-            id = "USR_" + System.currentTimeMillis().toString().takeLast(6),
-            email = targetEmail,
-            username = if (email.contains("@")) email.substringBefore("@") else email,
-            fullName = "BP User",
-            role = if (email.contains("admin", ignoreCase = true) || targetEmail == "boss@bpwallet.com" || targetEmail == "book@bpwallet.com" || inputKey == "book") "SUPER_ADMIN" else "USER",
-            walletBalance = 10000.0
-        )
-        if (profile.isBlocked) {
-            return@withContext Result.failure(Exception("Your account has been suspended by Super Admin."))
+        try {
+            checkConfigured()
+            val client = SupabaseClientProvider.client
+            if (client != null) {
+                // 1. Supabase Auth Email/Password Sign-In
+                try {
+                    client.auth.signInWith(Email) {
+                        this.email = targetEmail
+                        this.password = pass
+                    }
+                } catch (authEx: Exception) {
+                    val msg = authEx.message ?: ""
+                    val formattedMsg = when {
+                        msg.contains("Invalid login credentials", ignoreCase = true) || msg.contains("invalid_credentials", ignoreCase = true) -> "Invalid email or password. Please try again."
+                        msg.contains("Email not confirmed", ignoreCase = true) -> "Please verify your email address before logging in."
+                        else -> parseAuthError(authEx)
+                    }
+                    return@withContext Result.failure(Exception(formattedMsg))
+                }
+
+                // 2. Retrieve Profile by Authenticated Supabase Auth User ID
+                val authUser = client.auth.currentUserOrNull()
+                val userId = authUser?.id
+
+                var remoteProfile: ProfileDto? = null
+                if (userId != null) {
+                    try {
+                        remoteProfile = client.postgrest["profiles"]
+                            .select { filter { eq("id", userId) } }
+                            .decodeSingleOrNull<ProfileDto>()
+                    } catch (_: Exception) {}
+                }
+
+                if (remoteProfile == null) {
+                    try {
+                        remoteProfile = client.postgrest["profiles"]
+                            .select { filter { eq("email", targetEmail) } }
+                            .decodeSingleOrNull<ProfileDto>()
+                    } catch (_: Exception) {}
+                }
+
+                if (remoteProfile != null) {
+                    if (remoteProfile.isBlocked) {
+                        return@withContext Result.failure(Exception("Your account has been suspended by Super Admin."))
+                    }
+                    profilesMap[targetEmail] = remoteProfile
+                    currentSessionUser = remoteProfile
+                    return@withContext Result.success(remoteProfile)
+                } else if (userId != null) {
+                    // Fail-safe: Create default profile row if auth exists but profile row is absent
+                    val newProfile = ProfileDto(
+                        id = userId,
+                        email = targetEmail,
+                        username = targetEmail.substringBefore("@"),
+                        fullName = "BP User",
+                        role = "USER",
+                        walletBalance = 0.0,
+                        isApproved = true,
+                        isBlocked = false
+                    )
+                    try {
+                        client.postgrest["profiles"].upsert(newProfile)
+                    } catch (_: Exception) {}
+                    profilesMap[targetEmail] = newProfile
+                    currentSessionUser = newProfile
+                    return@withContext Result.success(newProfile)
+                }
+            }
+        } catch (_: Exception) {}
+
+        val profile = profilesMap[targetEmail] ?: profilesMap[inputKey]
+        if (profile != null) {
+            if (profile.isBlocked) {
+                return@withContext Result.failure(Exception("Your account has been suspended by Super Admin."))
+            }
+            currentSessionUser = profile
+            return@withContext Result.success(profile)
         }
-        profilesMap[targetEmail] = profile
-        currentSessionUser = profile
-        Result.success(profile)
+
+        Result.failure(Exception("Account not found or invalid login credentials."))
     }
 
     suspend fun signOut(): Result<Unit> = withContext(Dispatchers.IO) {
@@ -208,7 +297,7 @@ class AppRepository {
             if (SupabaseClientProvider.isConfigured()) {
                 val client = SupabaseClientProvider.client
                 val user = client?.auth?.currentUserOrNull()
-                if (user != null && !user.email.isNullOrBlank()) {
+                if (user != null) {
                     try {
                         val remoteProfile = client.postgrest["profiles"]
                             .select { filter { eq("id", user.id) } }
@@ -302,6 +391,30 @@ class AppRepository {
             if (SupabaseClientProvider.isConfigured()) {
                 SupabaseClientProvider.client?.postgrest?.get("profiles")?.update({
                     set("wallet_balance", newBalance)
+                }) {
+                    filter { eq("id", userId) }
+                }
+            }
+        } catch (_: Exception) {}
+
+        Result.success(true)
+    }
+
+    suspend fun updateUserBetproCredentials(userId: String, username: String, password: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        val profile = profilesMap.values.find { it.id == userId }
+        if (profile != null && !profile.email.isNullOrBlank()) {
+            val updated = profile.copy(betproUsername = username, betproPassword = password)
+            profilesMap[profile.email.lowercase()] = updated
+            if (currentSessionUser?.id == userId) {
+                currentSessionUser = updated
+            }
+        }
+
+        try {
+            if (SupabaseClientProvider.isConfigured()) {
+                SupabaseClientProvider.client?.postgrest?.get("profiles")?.update({
+                    set("betpro_username", username)
+                    set("betpro_password", password)
                 }) {
                     filter { eq("id", userId) }
                 }

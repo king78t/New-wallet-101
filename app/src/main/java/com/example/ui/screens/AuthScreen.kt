@@ -86,7 +86,7 @@ fun AuthScreen(
                     AuthMode.CREATE_ACCOUNT -> CreateAccountScreen(
                         viewModel = viewModel,
                         onBackToLogin = { authMode = AuthMode.USER_LOGIN },
-                        onProceedToOtp = { authMode = AuthMode.OTP_VERIFICATION }
+                        onAccountCreated = { onLoginSuccess() }
                     )
 
                     AuthMode.OTP_VERIFICATION -> VerifyEmailScreen(

@@ -169,6 +169,9 @@ fun AppNavigation(viewModel: MainViewModel) {
                     navController.navigate("auth") {
                         popUpTo("user_dashboard") { inclusive = true }
                     }
+                },
+                onNavigateToBetPro = {
+                    navController.navigate("betpro_webview")
                 }
             )
         }

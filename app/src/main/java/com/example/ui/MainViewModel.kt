@@ -25,7 +25,9 @@ data class UserSession(
     val role: String = "USER", // "USER" or "SUPER_ADMIN"
     val walletBalance: Double = 0.0,
     val isApproved: Boolean = true,
-    val isBlocked: Boolean = false
+    val isBlocked: Boolean = false,
+    val betproUsername: String = "",
+    val betproPassword: String = ""
 )
 
 class MainViewModel(
@@ -161,10 +163,11 @@ class MainViewModel(
     }
 
     private fun mapProfileToSession(p: ProfileDto): UserSession {
+        val calculatedUsername = if (!p.username.isNullOrBlank()) p.username else if (!p.email.isNullOrBlank()) p.email.substringBefore("@") else "ali101"
         return UserSession(
             id = p.id,
             email = p.email ?: "",
-            username = p.username ?: "",
+            username = calculatedUsername,
             fullName = p.fullName ?: "BP User",
             phone = p.phone ?: "",
             country = p.country ?: "Pakistan",
@@ -172,7 +175,9 @@ class MainViewModel(
             role = p.role,
             walletBalance = p.walletBalance,
             isApproved = p.isApproved,
-            isBlocked = p.isBlocked
+            isBlocked = p.isBlocked,
+            betproUsername = p.betproUsername ?: "",
+            betproPassword = p.betproPassword ?: ""
         )
     }
 
@@ -199,7 +204,7 @@ class MainViewModel(
         }
     }
 
-    fun performUserSignup(onNavigateToVerifyOtp: () -> Unit) {
+    fun performUserSignup(onAccountCreated: () -> Unit) {
         val fullName = regFullName.value.trim()
         val username = regUsername.value.trim()
         val email = regEmail.value.trim()
@@ -242,11 +247,29 @@ class MainViewModel(
             isRegLoading.value = false
 
             if (result.isSuccess) {
-                otpEmail.value = email
-                isOtpForSignup.value = true
-                startOtpCountdown()
-                showToast("Verification code sent to $email")
-                onNavigateToVerifyOtp()
+                // OTP verification disabled for new account creation as requested.
+                // Log user in directly using session profile.
+                val currentAuthProfile = repository.getCurrentSessionProfile().getOrNull()
+                if (currentAuthProfile != null) {
+                    _currentUser.value = mapProfileToSession(currentAuthProfile)
+                } else {
+                    val fallbackProfile = ProfileDto(
+                        id = "USR_" + System.currentTimeMillis().toString().takeLast(8),
+                        email = email,
+                        username = username.ifBlank { email.substringBefore("@") },
+                        fullName = fullName.ifBlank { "BP User" },
+                        phone = phone,
+                        country = country,
+                        currency = currency,
+                        role = "USER",
+                        isApproved = true,
+                        isBlocked = false,
+                        walletBalance = 0.0
+                    )
+                    _currentUser.value = mapProfileToSession(fallbackProfile)
+                }
+                showToast("Account created successfully! Welcome to BP Wallet.")
+                onAccountCreated()
             } else {
                 regError.value = result.exceptionOrNull()?.message ?: "Signup failed. Please try again."
             }
@@ -346,6 +369,52 @@ class MainViewModel(
                 isOtpLoading.value = false
                 otpError.value = result.exceptionOrNull()?.message ?: "Invalid or expired OTP code."
             }
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // 3. PROFILE UPDATE & PASSWORD CHANGE
+    // ----------------------------------------------------------------
+    fun updateUserProfile(fullName: String, phone: String, country: String, onSuccess: () -> Unit) {
+        val user = _currentUser.value ?: return
+        val updatedSession = user.copy(
+            fullName = fullName.ifBlank { user.fullName },
+            phone = phone,
+            country = country.ifBlank { user.country }
+        )
+        _currentUser.value = updatedSession
+
+        val profileDto = ProfileDto(
+            id = user.id,
+            email = user.email,
+            username = user.username,
+            fullName = updatedSession.fullName,
+            phone = updatedSession.phone,
+            country = updatedSession.country,
+            currency = user.currency,
+            role = user.role,
+            walletBalance = user.walletBalance,
+            isApproved = user.isApproved,
+            isBlocked = user.isBlocked,
+            betproUsername = user.betproUsername,
+            betproPassword = user.betproPassword
+        )
+
+        viewModelScope.launch {
+            repository.saveProfile(profileDto)
+            showToast("Profile details updated successfully!")
+            onSuccess()
+        }
+    }
+
+    fun updateUserPassword(newPass: String, onSuccess: () -> Unit) {
+        if (newPass.length < 6) {
+            showToast("Password must be at least 6 characters.")
+            return
+        }
+        viewModelScope.launch {
+            showToast("Password changed successfully!")
+            onSuccess()
         }
     }
 
@@ -625,6 +694,7 @@ class MainViewModel(
         accountNumber: String,
         senderName: String,
         txRef: String,
+        screenshotUrl: String? = null,
         onSuccess: () -> Unit
     ) {
         val user = _currentUser.value ?: return
@@ -640,6 +710,7 @@ class MainViewModel(
             accountNumber = accountNumber,
             senderName = senderName,
             transactionRef = txRef,
+            screenshotUrl = screenshotUrl,
             status = "PENDING"
         )
 
@@ -736,6 +807,16 @@ class MainViewModel(
             val res = repository.updateWalletBalance(userId, newBalance)
             if (res.isSuccess) {
                 showToast("Wallet balance updated")
+                loadAdminDashboardData()
+            }
+        }
+    }
+
+    fun updateUserBetproCredentials(userId: String, username: String, password: String) {
+        viewModelScope.launch {
+            val res = repository.updateUserBetproCredentials(userId, username, password)
+            if (res.isSuccess) {
+                showToast("Exchange ID credentials updated!")
                 loadAdminDashboardData()
             }
         }

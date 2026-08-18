@@ -16,6 +16,8 @@ data class ProfileDto(
     @SerialName("wallet_balance") val walletBalance: Double = 0.0,
     @SerialName("is_approved") val isApproved: Boolean = true,
     @SerialName("is_blocked") val isBlocked: Boolean = false,
+    @SerialName("betpro_username") val betproUsername: String? = null,
+    @SerialName("betpro_password") val betproPassword: String? = null,
     @SerialName("created_at") val createdAt: String? = null
 )
 

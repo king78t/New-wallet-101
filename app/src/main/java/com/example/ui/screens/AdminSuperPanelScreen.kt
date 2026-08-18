@@ -26,9 +26,11 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DrawerValue
@@ -52,13 +54,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
 import com.example.data.models.PaymentGatewayDto
 import com.example.data.models.ProfileDto
 import com.example.data.models.TransactionDto
 import com.example.ui.MainViewModel
+import com.example.ui.components.AdminRequest
 import kotlinx.coroutines.launch
 
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -768,7 +774,9 @@ fun AdminUserManagementView(viewModel: MainViewModel, users: List<ProfileDto>) {
 
 @Composable
 fun AdminUserCard(profile: ProfileDto, viewModel: MainViewModel) {
-    var newBalanceText by remember { mutableStateOf(profile.walletBalance.toString()) }
+    var newBalanceText by remember(profile.id) { mutableStateOf(profile.walletBalance.toString()) }
+    var betproUserText by remember(profile.id) { mutableStateOf(profile.betproUsername ?: "") }
+    var betproPassText by remember(profile.id) { mutableStateOf(profile.betproPassword ?: "") }
 
     Card(
         modifier = Modifier
@@ -817,6 +825,7 @@ fun AdminUserCard(profile: ProfileDto, viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // Wallet Balance Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -848,9 +857,75 @@ fun AdminUserCard(profile: ProfileDto, viewModel: MainViewModel) {
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = "UPDATE",
+                        text = "UPDATE BAL",
                         color = Color.White,
                         fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF1F5F9)))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // BetPro Exchange Credentials Row
+            Text(
+                text = "🔑 ISSUE EXCHANGE ID CREDENTIALS",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF334155)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = betproUserText,
+                    onValueChange = { betproUserText = it },
+                    label = { Text("BetPro User", fontSize = 10.sp) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF10B981),
+                        unfocusedBorderColor = Color(0xFFE2E8F0)
+                    )
+                )
+
+                OutlinedTextField(
+                    value = betproPassText,
+                    onValueChange = { betproPassText = it },
+                    label = { Text("BetPro Pass", fontSize = 10.sp) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF10B981),
+                        unfocusedBorderColor = Color(0xFFE2E8F0)
+                    )
+                )
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF059669))
+                        .clickable {
+                            viewModel.updateUserBetproCredentials(
+                                profile.id,
+                                betproUserText.trim(),
+                                betproPassText.trim()
+                            )
+                        }
+                        .padding(horizontal = 10.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        text = "SAVE ID",
+                        color = Color.White,
+                        fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -861,138 +936,7 @@ fun AdminUserCard(profile: ProfileDto, viewModel: MainViewModel) {
 
 @Composable
 fun AdminTransactionManagementView(viewModel: MainViewModel) {
-    val txs by viewModel.allTransactionsForAdmin.collectAsState()
-
-    Text(
-        text = "DEPOSIT & WITHDRAWAL REQUESTS",
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Bold,
-        color = Color(0xFF111827),
-        modifier = Modifier.padding(bottom = 10.dp)
-    )
-
-    if (txs.isEmpty()) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
-        ) {
-            Text(
-                text = "No pending or past transactions found.",
-                modifier = Modifier.padding(16.dp),
-                color = Color(0xFF6B7280),
-                fontSize = 13.sp
-            )
-        }
-    } else {
-        txs.forEach { tx ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 10.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "${tx.type} - ${tx.amount} ${tx.currency}",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (tx.type == "DEPOSIT") Color(0xFF16A34A) else Color(0xFFD97706)
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    when (tx.status) {
-                                        "APPROVED" -> Color(0xFFDCFCE7)
-                                        "REJECTED" -> Color(0xFFFEE2E2)
-                                        else -> Color(0xFFFEF3C7)
-                                    }
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = tx.status,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = when (tx.status) {
-                                    "APPROVED" -> Color(0xFF16A34A)
-                                    "REJECTED" -> Color(0xFFEF4444)
-                                    else -> Color(0xFFD97706)
-                                }
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Text(
-                        text = "User: ${tx.userName} | Gateway: ${tx.gatewayName}",
-                        fontSize = 12.sp,
-                        color = Color(0xFF374151)
-                    )
-                    if (tx.transactionRef.isNotBlank()) {
-                        Text(
-                            text = "TRX Ref: ${tx.transactionRef}",
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF2563EB)
-                        )
-                    }
-
-                    if (tx.status == "PENDING") {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(36.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0xFF22C55E))
-                                    .clickable { viewModel.approveTransaction(tx.id) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "APPROVE",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(36.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0xFFEF4444))
-                                    .clickable { viewModel.rejectTransaction(tx.id) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "REJECT",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    AdminRequest(viewModel = viewModel)
 }
 
 @Composable

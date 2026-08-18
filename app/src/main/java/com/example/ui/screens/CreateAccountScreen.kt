@@ -57,7 +57,7 @@ import com.example.ui.validation.ValidationUtils
 fun CreateAccountScreen(
     viewModel: MainViewModel,
     onBackToLogin: () -> Unit,
-    onProceedToOtp: () -> Unit
+    onAccountCreated: () -> Unit
 ) {
     val fullName by viewModel.regFullName.collectAsState()
     val email by viewModel.regEmail.collectAsState()
@@ -423,7 +423,7 @@ fun CreateAccountScreen(
             FintechGradientButton(
                 text = "REGISTER ACCOUNT",
                 onClick = {
-                    viewModel.performUserSignup(onNavigateToVerifyOtp = onProceedToOtp)
+                    viewModel.performUserSignup(onAccountCreated = onAccountCreated)
                 },
                 isLoading = isLoading,
                 modifier = Modifier.fillMaxWidth()
