@@ -48,6 +48,7 @@ import com.example.ui.components.FintechLogoHeader
 import com.example.ui.components.FintechSecondaryButton
 import com.example.ui.components.FintechSegmentedControl
 import com.example.ui.components.FintechTextField
+import com.example.ui.validation.ValidationUtils
 
 @Composable
 fun UserLoginScreen(
@@ -100,6 +101,12 @@ fun UserLoginScreen(
                 modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
             )
 
+            val isEmailFormatInvalid = email.isNotBlank() && !ValidationUtils.isValidEmailOrPhone(email)
+            val isEmailValid = email.isNotBlank() && ValidationUtils.isValidEmailOrPhone(email)
+            val emailSuccessText = if (isEmailValid) {
+                if (ValidationUtils.isValidEmail(email)) "✓ Valid Email" else "✓ Valid Mobile Number"
+            } else null
+
             FintechTextField(
                 value = email,
                 onValueChange = { 
@@ -108,12 +115,17 @@ fun UserLoginScreen(
                 },
                 label = "Mobile Number or Email",
                 leadingIcon = Icons.Outlined.Person,
-                isError = errorMsg != null && (email.isBlank() || errorMsg?.contains("email", ignoreCase = true) == true),
+                isError = isEmailFormatInvalid || (errorMsg != null && (email.isBlank() || errorMsg?.contains("email", ignoreCase = true) == true)),
+                errorMessage = if (isEmailFormatInvalid) "Enter a valid email (e.g. name@domain.com) or phone" else null,
+                successMessage = emailSuccessText,
                 isLoading = isLoading,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
             )
 
             Spacer(modifier = Modifier.height(14.dp))
+
+            val isPassLengthInvalid = password.isNotBlank() && password.length < 6
+            val isPassValid = password.length >= 6
 
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
@@ -132,8 +144,9 @@ fun UserLoginScreen(
                     },
                     label = "••••••••",
                     leadingIcon = Icons.Outlined.Lock,
-                    isError = errorMsg != null && (password.isBlank() || errorMsg?.contains("password", ignoreCase = true) == true || errorMsg?.contains("credential", ignoreCase = true) == true || errorMsg?.contains("failed", ignoreCase = true) == true),
-                    errorMessage = if (errorMsg != null) errorMsg else null,
+                    isError = isPassLengthInvalid || (errorMsg != null && (password.isBlank() || errorMsg?.contains("password", ignoreCase = true) == true || errorMsg?.contains("credential", ignoreCase = true) == true || errorMsg?.contains("failed", ignoreCase = true) == true)),
+                    errorMessage = if (isPassLengthInvalid) "Password must be at least 6 characters" else errorMsg,
+                    successMessage = if (isPassValid && errorMsg == null) "✓ Valid password format" else null,
                     isLoading = isLoading,
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {

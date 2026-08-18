@@ -50,6 +50,8 @@ import com.example.ui.components.FintechGradientButton
 import com.example.ui.components.FintechLogoHeader
 import com.example.ui.components.FintechSegmentedControl
 import com.example.ui.components.FintechTextField
+import com.example.ui.components.PasswordStrengthMeter
+import com.example.ui.validation.ValidationUtils
 
 @Composable
 fun CreateAccountScreen(
@@ -105,6 +107,9 @@ fun CreateAccountScreen(
             )
 
             // Full Name Field
+            val isNameInvalid = fullName.isNotBlank() && fullName.trim().length < 3
+            val isNameValid = fullName.trim().length >= 3
+
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = "Full Name",
@@ -122,6 +127,9 @@ fun CreateAccountScreen(
                     },
                     label = "e.g. Hamza Malik",
                     leadingIcon = Icons.Outlined.Person,
+                    isError = isNameInvalid || (errorMsg != null && errorMsg?.contains("name", ignoreCase = true) == true),
+                    errorMessage = if (isNameInvalid) "Full name must be at least 3 characters" else null,
+                    successMessage = if (isNameValid) "✓ Valid name" else null,
                     isLoading = isLoading
                 )
             }
@@ -129,6 +137,9 @@ fun CreateAccountScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Email Address Field
+            val isEmailInvalid = email.isNotBlank() && !ValidationUtils.isValidEmail(email)
+            val isEmailValid = ValidationUtils.isValidEmail(email)
+
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = "Email Address",
@@ -146,6 +157,9 @@ fun CreateAccountScreen(
                     },
                     label = "hamza@bpexch.com",
                     leadingIcon = Icons.Outlined.Email,
+                    isError = isEmailInvalid || (errorMsg != null && errorMsg?.contains("email", ignoreCase = true) == true),
+                    errorMessage = if (isEmailInvalid) "Enter a valid email format (e.g. user@domain.com)" else null,
+                    successMessage = if (isEmailValid) "✓ Valid email address format" else null,
                     isLoading = isLoading,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                 )
@@ -333,7 +347,9 @@ fun CreateAccountScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Password Field
+            // Password Field & Real-Time Strength Meter
+            val passStrength = remember(password) { ValidationUtils.evaluatePasswordStrength(password) }
+
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = "Password",
@@ -364,11 +380,19 @@ fun CreateAccountScreen(
                         }
                     }
                 )
+
+                if (password.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    PasswordStrengthMeter(strength = passStrength)
+                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
             // Confirm Password Field
+            val isConfirmMismatch = confirmPassword.isNotBlank() && confirmPassword != password
+            val isConfirmMatch = confirmPassword.isNotBlank() && confirmPassword == password
+
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = "Confirm Password",
@@ -386,7 +410,9 @@ fun CreateAccountScreen(
                     },
                     label = "••••••••",
                     leadingIcon = Icons.Outlined.Key,
-                    errorMessage = errorMsg,
+                    isError = isConfirmMismatch || (errorMsg != null && errorMsg?.contains("password", ignoreCase = true) == true),
+                    errorMessage = if (isConfirmMismatch) "Passwords do not match" else errorMsg,
+                    successMessage = if (isConfirmMatch && errorMsg == null) "✓ Passwords match" else null,
                     isLoading = isLoading,
                     visualTransformation = PasswordVisualTransformation()
                 )

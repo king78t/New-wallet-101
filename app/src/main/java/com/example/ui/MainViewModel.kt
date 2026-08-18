@@ -6,6 +6,7 @@ import com.example.data.supabase.PaymentGatewayDto
 import com.example.data.supabase.ProfileDto
 import com.example.data.supabase.SupabaseRepository
 import com.example.data.supabase.TransactionDto
+import com.example.ui.validation.ValidationUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -150,16 +151,12 @@ class MainViewModel(
         val country = regCountry.value
         val currency = regCurrency.value
 
-        if (fullName.isBlank()) {
-            regError.value = "Please enter your Full Name"
+        if (fullName.isBlank() || fullName.length < 3) {
+            regError.value = "Please enter your Full Name (at least 3 characters)"
             return
         }
-        if (username.isBlank()) {
-            regError.value = "Please enter a Username"
-            return
-        }
-        if (email.isBlank() || !email.contains("@")) {
-            regError.value = "Please enter a valid Email Address"
+        if (!ValidationUtils.isValidEmail(email)) {
+            regError.value = "Please enter a valid Email Address (e.g. name@domain.com)"
             return
         }
         if (password.length < 6) {
@@ -317,12 +314,12 @@ class MainViewModel(
         val email = loginEmail.value.trim()
         val pass = loginPassword.value
 
-        if (email.isBlank()) {
-            loginError.value = "Please enter your Email Address"
+        if (email.isBlank() || !ValidationUtils.isValidEmailOrPhone(email)) {
+            loginError.value = "Please enter a valid Email Address or Mobile Number"
             return
         }
-        if (pass.isBlank()) {
-            loginError.value = "Please enter your Password"
+        if (pass.isBlank() || pass.length < 6) {
+            loginError.value = "Please enter your Password (at least 6 characters)"
             return
         }
 

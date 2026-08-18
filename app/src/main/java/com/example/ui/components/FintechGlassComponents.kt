@@ -312,6 +312,8 @@ fun FintechTextField(
     trailingIcon: @Composable (() -> Unit)? = null,
     isError: Boolean = false,
     errorMessage: String? = null,
+    helperText: String? = null,
+    successMessage: String? = null,
     isLoading: Boolean = false,
     isAdminMode: Boolean = false,
     visualTransformation: VisualTransformation = VisualTransformation.None,
@@ -386,6 +388,22 @@ fun FintechTextField(
                 color = BpErrorRed,
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+            )
+        } else if (!successMessage.isNullOrBlank()) {
+            Text(
+                text = successMessage,
+                color = Color(0xFF059669),
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+            )
+        } else if (!helperText.isNullOrBlank()) {
+            Text(
+                text = helperText,
+                color = Color(0xFF6B7280),
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Normal,
                 modifier = Modifier.padding(start = 8.dp, top = 4.dp)
             )
         }
