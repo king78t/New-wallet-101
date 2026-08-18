@@ -28,19 +28,19 @@ class SupabaseClient {
     val baseUrl: String
         get() {
             val url = try { BuildConfig.SUPABASE_URL } catch (e: Throwable) { "" }
-            return if (url.isNullOrBlank() || url.contains("your-project")) "https://demo.supabase.co" else url.trimEnd('/')
+            return if (url.isNullOrBlank() || url.contains("your-project") || url.contains("demo.supabase.co")) "" else url.trimEnd('/')
         }
 
     val anonKey: String
         get() {
             val key = try { BuildConfig.SUPABASE_ANON_KEY } catch (e: Throwable) { "" }
-            return if (key.isNullOrBlank() || key.contains("your-supabase-anon-key")) "demo-anon-key" else key.trim()
+            return if (key.isNullOrBlank() || key.contains("your-supabase-anon-key") || key == "demo-anon-key") "" else key.trim()
         }
 
     fun isConfigured(): Boolean {
         val url = baseUrl
         val key = anonKey
-        return url.startsWith("https://") && !url.contains("your-project") && key.length > 20 && !key.contains("your-supabase-anon-key")
+        return url.startsWith("https://") && key.length > 20 && !url.contains("your-project") && !key.contains("your-supabase-anon-key")
     }
 
     suspend fun pingConnection(): Result<Boolean> = withContext(Dispatchers.IO) {

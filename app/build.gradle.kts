@@ -7,6 +7,29 @@ plugins {
   alias(libs.plugins.secrets)
 }
 
+fun getSecretValue(key: String): String {
+  val envVal = System.getenv(key)
+  if (!envVal.isNullOrBlank()) return envVal
+
+  val envFile = rootProject.file(".env")
+  if (envFile.exists()) {
+    envFile.useLines { lines ->
+      lines.forEach { line ->
+        val trimmed = line.trim()
+        if (trimmed.startsWith("$key=")) {
+          val valInFile = trimmed.substringAfter("=").trim().removeSurrounding("\"").removeSurrounding("'")
+          if (valInFile.isNotBlank()) return valInFile
+        }
+      }
+    }
+  }
+
+  val propVal = project.findProperty(key)?.toString()
+  if (!propVal.isNullOrBlank()) return propVal
+
+  return ""
+}
+
 android {
   namespace = "com.example"
   compileSdk = 36
@@ -19,6 +42,11 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    val supabaseUrl = getSecretValue("SUPABASE_URL")
+    val supabaseAnonKey = getSecretValue("SUPABASE_ANON_KEY")
+    buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+    buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
   }
 
   signingConfigs {
