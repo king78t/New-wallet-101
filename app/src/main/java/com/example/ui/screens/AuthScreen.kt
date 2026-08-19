@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,7 +28,6 @@ enum class AuthMode {
     USER_LOGIN,
     CREATE_ACCOUNT,
     ADMIN_LOGIN,
-    OTP_VERIFICATION,
     FORGOT_PASSWORD,
     RESET_PASSWORD
 }
@@ -42,7 +40,6 @@ fun AuthScreen(
     onAdminLoginSuccess: () -> Unit
 ) {
     var authMode by remember { mutableStateOf(AuthMode.USER_LOGIN) }
-    val isOtpForSignup by viewModel.isOtpForSignup.collectAsState()
 
     FintechBackground(
         isAdminMode = (authMode == AuthMode.ADMIN_LOGIN)
@@ -89,22 +86,10 @@ fun AuthScreen(
                         onAccountCreated = { onLoginSuccess() }
                     )
 
-                    AuthMode.OTP_VERIFICATION -> VerifyEmailScreen(
-                        viewModel = viewModel,
-                        onBack = { authMode = if (isOtpForSignup) AuthMode.CREATE_ACCOUNT else AuthMode.FORGOT_PASSWORD },
-                        onVerifySuccess = {
-                            if (isOtpForSignup) {
-                                onLoginSuccess()
-                            } else {
-                                authMode = AuthMode.RESET_PASSWORD
-                            }
-                        }
-                    )
-
                     AuthMode.FORGOT_PASSWORD -> ForgotPasswordScreen(
                         viewModel = viewModel,
                         onBackToLogin = { authMode = AuthMode.USER_LOGIN },
-                        onProceedToOtp = { authMode = AuthMode.OTP_VERIFICATION }
+                        onSendSuccess = { authMode = AuthMode.USER_LOGIN }
                     )
 
                     AuthMode.RESET_PASSWORD -> ResetPasswordScreen(

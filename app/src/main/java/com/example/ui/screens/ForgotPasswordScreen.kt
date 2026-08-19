@@ -38,7 +38,7 @@ import com.example.ui.components.FintechTextField
 fun ForgotPasswordScreen(
     viewModel: MainViewModel,
     onBackToLogin: () -> Unit,
-    onProceedToOtp: () -> Unit
+    onSendSuccess: () -> Unit
 ) {
     val email by viewModel.forgotEmail.collectAsState()
     val errorMsg by viewModel.forgotError.collectAsState()
@@ -89,7 +89,7 @@ fun ForgotPasswordScreen(
             )
 
             Text(
-                text = "Enter your registered Email address to receive password reset OTP",
+                text = "Enter your registered Email address to receive a password reset link",
                 fontSize = 12.5.sp,
                 color = Color(0xFF4B5563),
                 textAlign = TextAlign.Center,
@@ -111,9 +111,9 @@ fun ForgotPasswordScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             FintechGradientButton(
-                text = "SEND RESET CODE",
+                text = "SEND RESET LINK",
                 onClick = {
-                    viewModel.sendPasswordReset(onProceedToOtp = onProceedToOtp)
+                    viewModel.sendPasswordReset(onSuccess = onSendSuccess)
                 },
                 isLoading = isLoading
             )

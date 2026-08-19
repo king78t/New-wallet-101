@@ -125,8 +125,6 @@ class MainViewModel(
         regFullName.value = ""
         regPhone.value = ""
         regEmail.value = ""
-        otpEmail.value = ""
-        otpDigits.value = listOf("", "", "", "", "", "")
         forgotEmail.value = ""
         _userTransactions.value = emptyList()
         _allTransactionsForAdmin.value = emptyList()
@@ -247,26 +245,9 @@ class MainViewModel(
             isRegLoading.value = false
 
             if (result.isSuccess) {
-                // OTP verification disabled for new account creation as requested.
-                // Log user in directly using session profile.
-                val currentAuthProfile = repository.getCurrentSessionProfile().getOrNull()
-                if (currentAuthProfile != null) {
-                    _currentUser.value = mapProfileToSession(currentAuthProfile)
-                } else {
-                    val fallbackProfile = ProfileDto(
-                        id = "USR_" + System.currentTimeMillis().toString().takeLast(8),
-                        email = email,
-                        username = username.ifBlank { email.substringBefore("@") },
-                        fullName = fullName.ifBlank { "BP User" },
-                        phone = phone,
-                        country = country,
-                        currency = currency,
-                        role = "USER",
-                        isApproved = true,
-                        isBlocked = false,
-                        walletBalance = 0.0
-                    )
-                    _currentUser.value = mapProfileToSession(fallbackProfile)
+                val profile = result.getOrNull()
+                if (profile != null) {
+                    _currentUser.value = mapProfileToSession(profile)
                 }
                 showToast("Account created successfully! Welcome to BP Wallet.")
                 onAccountCreated()
@@ -277,100 +258,8 @@ class MainViewModel(
     }
 
     // ----------------------------------------------------------------
-    // 2. OTP VERIFICATION (SIGNUP & PASSWORD RECOVERY)
+    // 2. PROFILE UPDATE & PASSWORD CHANGE
     // ----------------------------------------------------------------
-    val otpEmail = MutableStateFlow("")
-    val otpDigits = MutableStateFlow(listOf("", "", "", "", "", ""))
-    val otpError = MutableStateFlow<String?>(null)
-    val isOtpLoading = MutableStateFlow(false)
-    val isOtpForSignup = MutableStateFlow(true)
-    val otpCountdown = MutableStateFlow(60)
-
-    fun updateOtpDigit(index: Int, value: String) {
-        if (value.length <= 1) {
-            val list = otpDigits.value.toMutableList()
-            list[index] = value
-            otpDigits.value = list
-            otpError.value = null
-        } else if (value.length == 6) {
-            otpDigits.value = value.map { it.toString() }
-            otpError.value = null
-        }
-    }
-
-    fun startOtpCountdown() {
-        viewModelScope.launch {
-            otpCountdown.value = 60
-            while (otpCountdown.value > 0) {
-                delay(1000)
-                otpCountdown.value -= 1
-            }
-        }
-    }
-
-    fun resendOtp() {
-        val email = otpEmail.value.trim()
-        if (email.isBlank()) return
-
-        viewModelScope.launch {
-            val result = repository.resetPasswordForEmail(email)
-            if (result.isSuccess) {
-                showToast("Resent OTP verification code to $email")
-                startOtpCountdown()
-            } else {
-                otpError.value = result.exceptionOrNull()?.message ?: "Failed to resend OTP"
-            }
-        }
-    }
-
-    fun verifyOtp(onSuccess: () -> Unit) {
-        val token = otpDigits.value.joinToString("")
-        val email = otpEmail.value.trim()
-
-        if (token.length < 6) {
-            otpError.value = "Please enter the complete 6-digit OTP code"
-            return
-        }
-
-        otpError.value = null
-        isOtpLoading.value = true
-
-        viewModelScope.launch {
-            val isSignup = isOtpForSignup.value
-            val result = repository.verifyOtp(email = email, token = token, isSignup = isSignup)
-
-            if (result.isSuccess) {
-                if (isSignup) {
-                    val currentAuthProfile = repository.getCurrentSessionProfile().getOrNull()
-                    val profileToSave = ProfileDto(
-                        id = currentAuthProfile?.id ?: "",
-                        email = email,
-                        username = regUsername.value.ifBlank { email.substringBefore("@") },
-                        fullName = regFullName.value.ifBlank { "BP User" },
-                        phone = regPhone.value,
-                        country = regCountry.value,
-                        currency = regCurrency.value,
-                        role = "USER",
-                        isApproved = true,
-                        isBlocked = false,
-                        walletBalance = 0.0
-                    )
-                    repository.saveProfile(profileToSave)
-                    _currentUser.value = mapProfileToSession(profileToSave)
-                    isOtpLoading.value = false
-                    showToast("Email verified! Account created successfully.")
-                    onSuccess()
-                } else {
-                    isOtpLoading.value = false
-                    showToast("OTP verified! Set your new password.")
-                    onSuccess()
-                }
-            } else {
-                isOtpLoading.value = false
-                otpError.value = result.exceptionOrNull()?.message ?: "Invalid or expired OTP code."
-            }
-        }
-    }
 
     // ----------------------------------------------------------------
     // 3. PROFILE UPDATE & PASSWORD CHANGE
@@ -573,7 +462,7 @@ class MainViewModel(
     val forgotError = MutableStateFlow<String?>(null)
     val isForgotLoading = MutableStateFlow(false)
 
-    fun sendPasswordReset(onProceedToOtp: () -> Unit) {
+    fun sendPasswordReset(onSuccess: () -> Unit) {
         val email = forgotEmail.value.trim()
         if (email.isBlank() || !email.contains("@")) {
             forgotError.value = "Please enter a valid Email Address"
@@ -588,11 +477,8 @@ class MainViewModel(
             isForgotLoading.value = false
 
             if (result.isSuccess) {
-                otpEmail.value = email
-                isOtpForSignup.value = false
-                startOtpCountdown()
-                showToast("Password reset code sent to $email")
-                onProceedToOtp()
+                showToast("Password reset link sent to $email")
+                onSuccess()
             } else {
                 forgotError.value = result.exceptionOrNull()?.message ?: "Failed to send reset link."
             }

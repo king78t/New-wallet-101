@@ -7,7 +7,6 @@ import com.example.data.models.TransactionDto
 import com.example.data.supabase.SupabaseClientProvider
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
-import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -68,14 +67,16 @@ class AppRepository {
         phone: String,
         country: String,
         currency: String
-    ): Result<Boolean> = withContext(Dispatchers.IO) {
+    ): Result<ProfileDto> = withContext(Dispatchers.IO) {
         try {
             checkConfigured()
             val client = SupabaseClientProvider.client ?: return@withContext Result.failure(Exception("Supabase client is not available."))
 
             val targetEmail = email.trim().lowercase()
+            val targetUsername = username.trim().ifBlank { targetEmail.substringBefore("@") }
+            val targetName = fullName.trim().ifBlank { "BP User" }
 
-            // 1. Create Supabase Auth Account
+            // 1. Call Supabase Auth signUpWith(Email)
             try {
                 client.auth.signUpWith(Email) {
                     this.email = targetEmail
@@ -86,93 +87,56 @@ class AppRepository {
                 return@withContext Result.failure(Exception(userFriendlyMsg))
             }
 
-            // 2. Obtain Authenticated User's UUID from Supabase Auth
+            // 2. Obtain Authenticated or Registered User's Real UUID from Supabase Auth
             val authUser = client.auth.currentUserOrNull()
-            val userId = authUser?.id ?: ("USR_" + System.currentTimeMillis().toString().takeLast(8))
+            var userId = authUser?.id
 
-            // 3. Construct Profile DTO (Public signup is strictly role = "USER")
+            // If active session not established directly by signUpWith, attempt immediate signIn to establish session
+            if (userId == null) {
+                try {
+                    client.auth.signInWith(Email) {
+                        this.email = targetEmail
+                        this.password = pass
+                    }
+                    userId = client.auth.currentUserOrNull()?.id
+                } catch (_: Exception) {}
+            }
+
+            if (userId.isNullOrBlank()) {
+                return@withContext Result.failure(Exception("Account created in Supabase Auth, but 'Confirm email' is enabled in Supabase Dashboard. Please turn 'Confirm email' OFF in Supabase -> Auth -> Providers -> Email."))
+            }
+
+            // 3. Construct Profile DTO with real Auth UUID
             val profile = ProfileDto(
-                id = userId,
+                id = userId, // REAL Auth UUID
                 email = targetEmail,
-                username = username.ifBlank { targetEmail.substringBefore("@") },
-                fullName = fullName.ifBlank { "BP User" },
+                username = targetUsername,
+                fullName = targetName,
                 phone = phone,
                 country = country,
                 currency = currency,
-                role = "USER", // STRICT: Normal public signup is always "USER"
+                role = "USER",
                 walletBalance = 0.0,
                 isApproved = true,
                 isBlocked = false
             )
 
-            // Save to local cache
             profilesMap[targetEmail] = profile
 
             // 4. Insert Profile Row into Supabase Postgrest 'profiles' table
             try {
                 client.postgrest["profiles"].upsert(profile)
             } catch (dbEx: Exception) {
-                // Return clear error if database profile creation fails
                 val dbMsg = dbEx.localizedMessage ?: "Failed to write profile record to database"
-                return@withContext Result.failure(Exception("Auth created, but profile database entry failed: $dbMsg"))
+                return@withContext Result.failure(Exception("Auth account created, but database profile creation failed: $dbMsg"))
             }
 
             currentSessionUser = profile
-            Result.success(true)
+            Result.success(profile)
         } catch (e: Exception) {
             val userFriendlyMsg = parseAuthError(e)
             Result.failure(Exception(userFriendlyMsg))
         }
-    }
-
-    suspend fun verifyOtp(
-        email: String,
-        token: String,
-        isSignup: Boolean = true
-    ): Result<Boolean> = withContext(Dispatchers.IO) {
-        val targetEmail = email.trim().lowercase()
-        try {
-            checkConfigured()
-            val client = SupabaseClientProvider.client
-            if (client != null) {
-                try {
-                    client.auth.verifyEmailOtp(
-                        type = if (isSignup) OtpType.Email.SIGNUP else OtpType.Email.EMAIL,
-                        email = targetEmail,
-                        token = token
-                    )
-                } catch (otpEx: Exception) {
-                    val msg = parseAuthError(otpEx)
-                    return@withContext Result.failure(Exception(msg))
-                }
-
-                val user = client.auth.currentUserOrNull()
-                if (user != null) {
-                    try {
-                        val remoteProfile = client.postgrest["profiles"]
-                            .select { filter { eq("id", user.id) } }
-                            .decodeSingleOrNull<ProfileDto>()
-                        if (remoteProfile != null) {
-                            currentSessionUser = remoteProfile
-                            profilesMap[targetEmail] = remoteProfile
-                        }
-                    } catch (_: Exception) {}
-                }
-                return@withContext Result.success(true)
-            }
-        } catch (_: Exception) {}
-
-        val profile = profilesMap[targetEmail] ?: ProfileDto(
-            id = "USR_" + System.currentTimeMillis().toString().takeLast(6),
-            email = targetEmail,
-            username = targetEmail.substringBefore("@"),
-            fullName = "BP User",
-            role = "USER",
-            walletBalance = 0.0
-        )
-        profilesMap[targetEmail] = profile
-        currentSessionUser = profile
-        Result.success(true)
     }
 
     suspend fun signIn(email: String, pass: String): Result<ProfileDto> = withContext(Dispatchers.IO) {
@@ -242,6 +206,14 @@ class AppRepository {
                 }
 
                 if (remoteProfile != null) {
+                    if (userId != null && remoteProfile.id != userId) {
+                        // Heal legacy profile ID mismatch so it matches Supabase Auth user UUID
+                        val healedProfile = remoteProfile.copy(id = userId)
+                        try {
+                            client.postgrest["profiles"].upsert(healedProfile)
+                            remoteProfile = healedProfile
+                        } catch (_: Exception) {}
+                    }
                     if (remoteProfile.isBlocked) {
                         return@withContext Result.failure(Exception("Your account has been suspended by Super Admin."))
                     }
