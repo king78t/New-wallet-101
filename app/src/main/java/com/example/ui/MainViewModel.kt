@@ -249,6 +249,8 @@ class MainViewModel(
                 if (profile != null) {
                     _currentUser.value = mapProfileToSession(profile)
                 }
+                // Instantly sync newly created user profile & activity to Super Admin Dashboard
+                loadAdminDashboardData()
                 showToast("Account created successfully! Welcome to BP Wallet.")
                 onAccountCreated()
             } else {
@@ -264,10 +266,12 @@ class MainViewModel(
     // ----------------------------------------------------------------
     // 3. PROFILE UPDATE & PASSWORD CHANGE
     // ----------------------------------------------------------------
-    fun updateUserProfile(fullName: String, phone: String, country: String, onSuccess: () -> Unit) {
+    fun updateUserProfile(fullName: String, username: String = "", phone: String, country: String, onSuccess: () -> Unit = {}) {
         val user = _currentUser.value ?: return
+        val newUsername = username.trim().ifBlank { user.username }
         val updatedSession = user.copy(
             fullName = fullName.ifBlank { user.fullName },
+            username = newUsername,
             phone = phone,
             country = country.ifBlank { user.country }
         )
@@ -276,7 +280,7 @@ class MainViewModel(
         val profileDto = ProfileDto(
             id = user.id,
             email = user.email,
-            username = user.username,
+            username = updatedSession.username,
             fullName = updatedSession.fullName,
             phone = updatedSession.phone,
             country = updatedSession.country,
@@ -378,57 +382,29 @@ class MainViewModel(
         isAdminLoading.value = true
 
         viewModelScope.launch {
-            val isBookCredentials = (inputIdentifier.equals("Book", ignoreCase = true) ||
+            val isBookCredentials = (inputIdentifier.equals("book", ignoreCase = true) ||
                     inputIdentifier.equals("book@bpwallet.com", ignoreCase = true)) &&
-                    pass == "Aliking0#"
+                    pass == "Abc12345"
 
             if (isBookCredentials) {
                 val bookSession = UserSession(
                     id = "superadmin_book_001",
                     email = "book@bpwallet.com",
-                    username = "Book",
-                    fullName = "Book (Super Admin)",
+                    username = "book",
+                    fullName = "Super Admin (book)",
                     phone = "+923000000000",
-                    country = "Pakistan",
-                    currency = "PKR",
+                    country = "Global",
+                    currency = "USD",
                     role = "SUPER_ADMIN",
-                    walletBalance = 0.0,
+                    walletBalance = 999999.0,
                     isApproved = true,
                     isBlocked = false
                 )
                 _currentUser.value = bookSession
                 _isAdminLoggedIn.value = true
                 isAdminLoading.value = false
-                loadAdminDashboardData()
-                showToast("Welcome Super Admin Book!")
-                onSuccess()
-                return@launch
-            }
-
-            val isBossCredentials = (inputIdentifier.equals("Boss", ignoreCase = true) ||
-                    inputIdentifier.equals("boss@bpwallet.com", ignoreCase = true) ||
-                    inputIdentifier.equals("boss@admin.com", ignoreCase = true)) &&
-                    pass == "Asdf1234"
-
-            if (isBossCredentials) {
-                val bossSession = UserSession(
-                    id = "super_admin_boss",
-                    email = "boss@bpwallet.com",
-                    username = "Boss",
-                    fullName = "Boss (Super Admin)",
-                    phone = "+923000000000",
-                    country = "Pakistan",
-                    currency = "PKR",
-                    role = "SUPER_ADMIN",
-                    walletBalance = 0.0,
-                    isApproved = true,
-                    isBlocked = false
-                )
-                _currentUser.value = bossSession
-                _isAdminLoggedIn.value = true
-                isAdminLoading.value = false
-                loadAdminDashboardData()
-                showToast("Welcome Super Admin Boss!")
+                startAdminRealtimeSync()
+                showToast("Welcome Super Admin!")
                 onSuccess()
                 return@launch
             }
@@ -438,11 +414,11 @@ class MainViewModel(
 
             if (result.isSuccess) {
                 val profile = result.getOrNull()
-                if (profile != null && (profile.role.equals("SUPER_ADMIN", ignoreCase = true) || profile.role.equals("SuperAdmin", ignoreCase = true))) {
+                if (profile != null && (profile.role.equals("SUPER_ADMIN", ignoreCase = true) || profile.role.equals("SuperAdmin", ignoreCase = true) || profile.role.equals("ADMIN", ignoreCase = true))) {
                     val session = mapProfileToSession(profile)
                     _currentUser.value = session
                     _isAdminLoggedIn.value = true
-                    loadAdminDashboardData()
+                    startAdminRealtimeSync()
                     showToast("Super Admin Logged In Successfully!")
                     onSuccess()
                 } else {
@@ -650,6 +626,53 @@ class MainViewModel(
         }
     }
 
+    fun submitTransferRequest(
+        recipient: String,
+        amount: Double,
+        remarks: String = "",
+        onSuccess: () -> Unit
+    ) {
+        val user = _currentUser.value ?: return
+        if (amount <= 0.0) {
+            showToast("Please enter a valid amount.")
+            return
+        }
+        if (amount > user.walletBalance) {
+            showToast("Insufficient wallet balance for transfer.")
+            return
+        }
+        if (recipient.isBlank()) {
+            showToast("Please specify recipient username or email.")
+            return
+        }
+
+        val tx = TransactionDto(
+            id = "tx_${System.currentTimeMillis()}",
+            userId = user.id,
+            userName = user.fullName,
+            type = "TRANSFER",
+            amount = amount,
+            currency = user.currency,
+            gatewayName = "Internal Transfer ($recipient)",
+            accountTitle = recipient,
+            accountNumber = recipient,
+            senderName = user.username.ifBlank { user.email },
+            transactionRef = remarks.ifBlank { "TRF_${System.currentTimeMillis().toString().takeLast(6)}" },
+            status = "PENDING"
+        )
+
+        viewModelScope.launch {
+            val res = repository.createTransaction(tx)
+            if (res.isSuccess) {
+                showToast("Transfer of ${user.currency} $amount to $recipient requested successfully!")
+                loadUserTransactions()
+                onSuccess()
+            } else {
+                showToast("Error: ${res.exceptionOrNull()?.message}")
+            }
+        }
+    }
+
     // ----------------------------------------------------------------
     // 8. SUPER ADMIN MANAGEMENT
     // ----------------------------------------------------------------
@@ -665,6 +688,21 @@ class MainViewModel(
             _allTransactionsForAdmin.value = txRes.getOrDefault(emptyList())
 
             loadAdminPaymentGateways()
+        }
+    }
+
+    private fun startAdminRealtimeSync() {
+        loadAdminDashboardData()
+        viewModelScope.launch {
+            while (_isAdminLoggedIn.value) {
+                kotlinx.coroutines.delay(4000)
+                if (!_isAdminLoggedIn.value) break
+                val usersRes = repository.getAllProfiles()
+                _adminUsersList.value = usersRes.getOrDefault(emptyList())
+
+                val txRes = repository.getTransactions(null)
+                _allTransactionsForAdmin.value = txRes.getOrDefault(emptyList())
+            }
         }
     }
 

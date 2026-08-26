@@ -115,7 +115,9 @@ fun UserDashboardScreen(
 
     var showDepositModal by remember { mutableStateOf(false) }
     var showWithdrawModal by remember { mutableStateOf(false) }
+    var showTransferModal by remember { mutableStateOf(false) }
     var showHistoryModal by remember { mutableStateOf(false) }
+    var isFabExpanded by remember { mutableStateOf(false) }
     var selectedBottomNavTab by remember { mutableStateOf(0) } // 0: Home, 1: Deposit, 2: BetPro, 3: Withdraw, 4: History
 
     LaunchedEffect(userSession?.currency) {
@@ -126,8 +128,8 @@ fun UserDashboardScreen(
     }
 
     val currency = userSession?.currency ?: "PKR"
-    val userName = userSession?.fullName?.ifBlank { "Ali" } ?: "Ali"
-    val userHandle = "@${userSession?.username?.ifBlank { "bptraders_pkr" } ?: "bptraders_pkr"}"
+    val userName = userSession?.fullName?.ifBlank { "BP User" } ?: "BP User"
+    val userHandle = if (userSession?.username.isNullOrBlank()) "@user" else "@${userSession?.username}"
     val betproUser = userSession?.betproUsername ?: ""
     val betproPass = userSession?.betproPassword ?: ""
     val hasCredentials = betproUser.isNotBlank() && betproPass.isNotBlank()
@@ -663,6 +665,174 @@ fun UserDashboardScreen(
             }
         }
 
+        // FLOATING ACTION BUTTON (FAB) SPEED DIAL QUICK ACTIONS MENU
+        if (isFabExpanded) {
+            // Backdrop to close menu when tapping outside
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .clickable { isFabExpanded = false }
+            )
+
+            // Speed Dial Expanded Items (Deposit, Withdraw, Transfer)
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 144.dp, end = 20.dp)
+            ) {
+                // Option 3: Transfer
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.clickable {
+                        isFabExpanded = false
+                        showTransferModal = true
+                    }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .shadow(4.dp, RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF0F172A))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "Transfer",
+                            color = Color.White,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .shadow(6.dp, CircleShape, ambientColor = Color(0x406366F1))
+                            .clip(CircleShape)
+                            .background(Brush.horizontalGradient(listOf(Color(0xFF6366F1), Color(0xFF4F46E5)))),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Payments,
+                            contentDescription = "Transfer",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+
+                // Option 2: Withdraw
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.clickable {
+                        isFabExpanded = false
+                        showWithdrawModal = true
+                    }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .shadow(4.dp, RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF0F172A))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "Withdraw",
+                            color = Color.White,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .shadow(6.dp, CircleShape, ambientColor = Color(0x400F172A))
+                            .clip(CircleShape)
+                            .background(Brush.horizontalGradient(listOf(Color(0xFF334155), Color(0xFF0F172A)))),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Remove,
+                            contentDescription = "Withdraw",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+
+                // Option 1: Deposit
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.clickable {
+                        isFabExpanded = false
+                        showDepositModal = true
+                    }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .shadow(4.dp, RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF0F172A))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "Deposit",
+                            color = Color.White,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .shadow(6.dp, CircleShape, ambientColor = Color(0x4010B981))
+                            .clip(CircleShape)
+                            .background(Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF059669)))),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Deposit",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Main Floating Action Button (FAB) Trigger
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 76.dp, end = 20.dp)
+                .size(56.dp)
+                .shadow(8.dp, CircleShape, ambientColor = Color(0x4010B981), spotColor = Color(0x4010B981))
+                .clip(CircleShape)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = if (isFabExpanded) listOf(Color(0xFFEF4444), Color(0xFFDC2626))
+                        else listOf(Color(0xFF10B981), Color(0xFF047857))
+                    )
+                )
+                .clickable { isFabExpanded = !isFabExpanded },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (isFabExpanded) Icons.Default.Close else Icons.Default.Add,
+                contentDescription = "Quick Actions FAB Menu",
+                tint = Color.White,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+
         // FIXED BOTTOM NAVIGATION BAR WITH 5 TABS (Home, Deposit, BetPro, Withdraw, History)
         Box(
             modifier = Modifier
@@ -813,6 +983,20 @@ fun UserDashboardScreen(
             onSubmit = { amount, gwName, accTitle, accNum, sender, ref, screenshotUrl ->
                 viewModel.submitDepositRequest(amount, gwName, accTitle, accNum, sender, ref, screenshotUrl) {
                     showDepositModal = false
+                }
+            }
+        )
+    }
+
+    // Modal Transfer Dialog
+    if (showTransferModal) {
+        TransferDialog(
+            userCurrency = currency,
+            userBalance = userSession?.walletBalance ?: 0.0,
+            onDismiss = { showTransferModal = false },
+            onSubmit = { recipient, amount, remarks ->
+                viewModel.submitTransferRequest(recipient, amount, remarks) {
+                    showTransferModal = false
                 }
             }
         )
@@ -1790,6 +1974,235 @@ fun WithdrawDialog(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TransferDialog(
+    userCurrency: String,
+    userBalance: Double,
+    onDismiss: () -> Unit,
+    onSubmit: (recipient: String, amount: Double, remarks: String) -> Unit
+) {
+    var recipientText by remember { mutableStateOf("") }
+    var amountText by remember { mutableStateOf("") }
+    var remarksText by remember { mutableStateOf("") }
+    var validationError by remember { mutableStateOf<String?>(null) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFEEF2FF)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Payments,
+                                contentDescription = null,
+                                tint = Color(0xFF4F46E5),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Transfer Funds",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF0F172A)
+                            )
+                            Text(
+                                text = "Instant wallet transfer",
+                                fontSize = 11.5.sp,
+                                color = Color(0xFF64748B)
+                            )
+                        }
+                    }
+
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color(0xFF94A3B8)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Available Balance Badge
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFF8FAFC))
+                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Available Balance",
+                            fontSize = 12.sp,
+                            color = Color(0xFF64748B),
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "$userCurrency ${String.format("%.2f", userBalance)}",
+                            fontSize = 14.sp,
+                            color = Color(0xFF10B981),
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Recipient Input
+                Text(
+                    text = "Recipient Username or Email",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF334155)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = recipientText,
+                    onValueChange = {
+                        recipientText = it
+                        validationError = null
+                    },
+                    placeholder = { Text("e.g. @john_doe or user@email.com") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF6366F1),
+                        unfocusedBorderColor = Color(0xFFE2E8F0)
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Amount Input
+                Text(
+                    text = "Transfer Amount ($userCurrency)",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF334155)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = {
+                        amountText = it
+                        validationError = null
+                    },
+                    placeholder = { Text("Enter amount") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF6366F1),
+                        unfocusedBorderColor = Color(0xFFE2E8F0)
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Remarks Input
+                Text(
+                    text = "Remarks / Note (optional)",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF334155)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = remarksText,
+                    onValueChange = { remarksText = it },
+                    placeholder = { Text("e.g. Payment for bill") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF6366F1),
+                        unfocusedBorderColor = Color(0xFFE2E8F0)
+                    )
+                )
+
+                if (validationError != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = validationError!!,
+                        color = Color(0xFFEF4444),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Confirm Transfer Button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .shadow(4.dp, RoundedCornerShape(25.dp), ambientColor = Color(0x306366F1))
+                        .clip(RoundedCornerShape(25.dp))
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(Color(0xFF6366F1), Color(0xFF4F46E5))
+                            )
+                        )
+                        .clickable {
+                            val amt = amountText.toDoubleOrNull()
+                            if (recipientText.isBlank()) {
+                                validationError = "Please enter recipient username or email"
+                            } else if (amt == null || amt <= 0.0) {
+                                validationError = "Please enter a valid amount > 0"
+                            } else if (amt > userBalance) {
+                                validationError = "Amount exceeds available balance"
+                            } else {
+                                onSubmit(recipientText.trim(), amt, remarksText.trim())
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Confirm Transfer",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }

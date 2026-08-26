@@ -16,8 +16,8 @@ data class UserEntity(
     val isApproved: Boolean = true,
     val isBlocked: Boolean = false,
     val walletBalance: Double = 0.0,
-    val betProUsername: String = "bpexch_ali101",
-    val betProPassword: String = "pass4078",
+    val betProUsername: String = "",
+    val betProPassword: String = "",
     val betProStatus: String = "ACTIVE ID", // "ACTIVE ID", "PENDING", "BLOCKED"
     val masterAgentName: String = "Pakistan Super Master"
 )

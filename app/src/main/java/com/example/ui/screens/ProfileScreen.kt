@@ -70,6 +70,7 @@ fun ProfileScreen(
     val userSession by viewModel.currentUser.collectAsState()
 
     var fullNameInput by remember { mutableStateOf(userSession?.fullName ?: "") }
+    var usernameInput by remember { mutableStateOf(userSession?.username ?: "") }
     var mobileInput by remember { mutableStateOf(userSession?.phone ?: "") }
     var countryInput by remember { mutableStateOf(userSession?.country ?: "Pakistan") }
     val currencyInput = userSession?.currency ?: "PKR"
@@ -82,6 +83,7 @@ fun ProfileScreen(
     LaunchedEffect(userSession) {
         userSession?.let {
             fullNameInput = it.fullName
+            usernameInput = it.username
             mobileInput = it.phone
             countryInput = it.country
         }
@@ -168,7 +170,7 @@ fun ProfileScreen(
 
                     Column {
                         Text(
-                            text = userSession?.fullName?.ifBlank { "Rahat Bano" } ?: "Rahat Bano",
+                            text = userSession?.fullName?.ifBlank { "User Profile" } ?: "User Profile",
                             fontSize = 19.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color(0xFF0F172A)
@@ -177,7 +179,7 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.height(2.dp))
 
                         Text(
-                            text = userSession?.email?.ifBlank { "alid15618@gmail.com" } ?: "alid15618@gmail.com",
+                            text = userSession?.email?.ifBlank { "No email set" } ?: "No email set",
                             fontSize = 12.5.sp,
                             color = Color(0xFF64748B)
                         )
@@ -201,7 +203,7 @@ fun ProfileScreen(
                                 )
                                 Spacer(modifier = Modifier.width(5.dp))
                                 Text(
-                                    text = "${userSession?.username?.ifBlank { "BP26664374" } ?: "BP26664374"} · $currencyInput",
+                                    text = "${userSession?.username?.ifBlank { "User" } ?: "User"} · $currencyInput",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF15803D)
@@ -244,6 +246,30 @@ fun ProfileScreen(
                     OutlinedTextField(
                         value = fullNameInput,
                         onValueChange = { fullNameInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedContainerColor = Color(0xFFF8FAFC),
+                            focusedContainerColor = Color.White,
+                            unfocusedBorderColor = Color(0xFFE2E8F0),
+                            focusedBorderColor = Color(0xFF00C853)
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Username Input
+                    Text(
+                        text = "Username",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF334155),
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    OutlinedTextField(
+                        value = usernameInput,
+                        onValueChange = { usernameInput = it },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
                         singleLine = true,
@@ -350,6 +376,7 @@ fun ProfileScreen(
                             .clickable {
                                 viewModel.updateUserProfile(
                                     fullName = fullNameInput,
+                                    username = usernameInput,
                                     phone = mobileInput,
                                     country = countryInput,
                                     onSuccess = {}
