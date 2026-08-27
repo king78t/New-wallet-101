@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -83,13 +84,28 @@ fun BetProWebViewScreen(
             }
         }
 
-        // Integrated Android WebView
+        // Integrated Android WebView (Fixed Layout & Viewport Settings)
         AndroidView(
             factory = { context ->
                 WebView(context).apply {
                     webViewClient = WebViewClient()
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
+                    
+                    settings.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        
+                        // Fix for half-screen & scaling issues:
+                        useWideViewPort = true
+                        loadWithOverviewMode = true
+                        setSupportZoom(true)
+                        builtInZoomControls = true
+                        displayZoomControls = false
+                        
+                        // Database & Cache optimization
+                        databaseEnabled = true
+                        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                    }
+                    
                     loadUrl(url)
                     webViewRef = this
                 }
@@ -97,7 +113,9 @@ fun BetProWebViewScreen(
             update = { view ->
                 webViewRef = view
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f) // Column ke andar remaining poori screen space WebView cover karega
         )
     }
 }
