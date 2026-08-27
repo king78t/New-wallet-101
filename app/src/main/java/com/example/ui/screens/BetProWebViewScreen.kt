@@ -84,28 +84,46 @@ fun BetProWebViewScreen(
             }
         }
 
-        // Integrated Android WebView (Fixed Layout & Viewport Settings)
+        // Integrated Android WebView (Responsive Scaling Fix)
         AndroidView(
             factory = { context ->
                 WebView(context).apply {
-                    webViewClient = WebViewClient()
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            // Responsive Mobile Viewport Force Injecting
+                            evaluateJavascript(
+                                """
+                                (function() {
+                                    var meta = document.querySelector('meta[name="viewport"]');
+                                    if (!meta) {
+                                        meta = document.createElement('meta');
+                                        meta.name = 'viewport';
+                                        document.getElementsByTagName('head')[0].appendChild(meta);
+                                    }
+                                    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=2.0, user-scalable=yes';
+                                })();
+                                """.trimIndent(), null
+                            )
+                        }
+                    }
                     
                     settings.apply {
                         javaScriptEnabled = true
                         domStorageEnabled = true
                         
-                        // Fix for half-screen & scaling issues:
+                        // Mobile Viewport and Scaling Configurations
                         useWideViewPort = true
                         loadWithOverviewMode = true
                         setSupportZoom(true)
                         builtInZoomControls = true
                         displayZoomControls = false
                         
-                        // Database & Cache optimization
                         databaseEnabled = true
                         mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                     }
                     
+                    setInitialScale(100)
                     loadUrl(url)
                     webViewRef = this
                 }
@@ -115,7 +133,7 @@ fun BetProWebViewScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f) // Column ke andar remaining poori screen space WebView cover karega
+                .weight(1f)
         )
     }
 }
