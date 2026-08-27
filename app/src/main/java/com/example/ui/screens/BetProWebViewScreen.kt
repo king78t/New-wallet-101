@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.graphics.Bitmap
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -84,46 +85,51 @@ fun BetProWebViewScreen(
             }
         }
 
-        // Integrated Android WebView (Responsive Scaling Fix)
+        // Integrated Android WebView (Fully Responsive Fix)
         AndroidView(
             factory = { context ->
                 WebView(context).apply {
                     webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView?, url: String?) {
                             super.onPageFinished(view, url)
-                            // Responsive Mobile Viewport Force Injecting
+                            // 1. Force Page Background and Full Height (Removes White Space below Login)
+                            // 2. Adjust Viewport Width (Fits Table and Content inside Mobile Screen)
                             evaluateJavascript(
                                 """
                                 (function() {
+                                    document.body.style.minHeight = '100vh';
+                                    document.body.style.backgroundColor = '#0d1812';
+                                    
                                     var meta = document.querySelector('meta[name="viewport"]');
                                     if (!meta) {
                                         meta = document.createElement('meta');
                                         meta.name = 'viewport';
                                         document.getElementsByTagName('head')[0].appendChild(meta);
                                     }
-                                    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=2.0, user-scalable=yes';
+                                    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes';
                                 })();
                                 """.trimIndent(), null
                             )
                         }
                     }
-                    
+
                     settings.apply {
                         javaScriptEnabled = true
                         domStorageEnabled = true
                         
-                        // Mobile Viewport and Scaling Configurations
+                        // Scale settings to fit width
                         useWideViewPort = true
                         loadWithOverviewMode = true
+                        
+                        // Enable Zoom so user can zoom table if needed
                         setSupportZoom(true)
                         builtInZoomControls = true
                         displayZoomControls = false
-                        
+
                         databaseEnabled = true
                         mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                     }
-                    
-                    setInitialScale(100)
+
                     loadUrl(url)
                     webViewRef = this
                 }
@@ -133,7 +139,7 @@ fun BetProWebViewScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .weight(1f) // Ensures top-to-bottom stretch
         )
     }
 }
