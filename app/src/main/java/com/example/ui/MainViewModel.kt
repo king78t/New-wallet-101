@@ -204,7 +204,7 @@ class MainViewModel(
 
     fun performUserSignup(onAccountCreated: () -> Unit) {
         val fullName = regFullName.value.trim()
-        val username = regUsername.value.trim()
+        val username = regUsername.value.trim().ifBlank { regEmail.value.trim().substringBefore("@") }
         val email = regEmail.value.trim()
         val phone = regPhone.value.trim()
         val password = regPassword.value
@@ -213,19 +213,27 @@ class MainViewModel(
         val currency = regCurrency.value
 
         if (fullName.isBlank() || fullName.length < 3) {
-            regError.value = "Please enter your Full Name (at least 3 characters)"
+            val err = "Please enter your Full Name (at least 3 characters)"
+            regError.value = err
+            showToast(err)
             return
         }
         if (!ValidationUtils.isValidEmail(email)) {
-            regError.value = "Please enter a valid Email Address (e.g. name@domain.com)"
+            val err = "Please enter a valid Email Address (e.g. name@domain.com)"
+            regError.value = err
+            showToast(err)
             return
         }
         if (password.length < 6) {
-            regError.value = "Password must be at least 6 characters"
+            val err = "Password must be at least 6 characters"
+            regError.value = err
+            showToast(err)
             return
         }
         if (password != confirmPassword) {
-            regError.value = "Passwords do not match"
+            val err = "Passwords do not match"
+            regError.value = err
+            showToast(err)
             return
         }
 
@@ -254,7 +262,9 @@ class MainViewModel(
                 showToast("Account created successfully! Welcome to BP Wallet.")
                 onAccountCreated()
             } else {
-                regError.value = result.exceptionOrNull()?.message ?: "Signup failed. Please try again."
+                val errMsg = result.exceptionOrNull()?.message ?: "Signup failed. Please try again."
+                regError.value = errMsg
+                showToast(errMsg)
             }
         }
     }

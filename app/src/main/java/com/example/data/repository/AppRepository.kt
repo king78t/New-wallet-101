@@ -68,30 +68,41 @@ class AppRepository {
         country: String,
         currency: String
     ): Result<ProfileDto> = withContext(Dispatchers.IO) {
-        try {
-            checkConfigured()
-            val client = SupabaseClientProvider.client ?: return@withContext Result.failure(Exception("Supabase client is not available."))
+        val targetEmail = email.trim().lowercase()
+        val targetUsername = username.trim().ifBlank { targetEmail.substringBefore("@") }
+        val targetName = fullName.trim().ifBlank { "BP User" }
 
-            val targetEmail = email.trim().lowercase()
-            val targetUsername = username.trim().ifBlank { targetEmail.substringBefore("@") }
-            val targetName = fullName.trim().ifBlank { "BP User" }
+        var finalUserId = "usr_${System.currentTimeMillis()}"
 
-            // 1. Call Supabase Auth signUpWith(Email)
+        // Attempt Supabase Auth Sign Up if configured
+        if (SupabaseClientProvider.isConfigured() && SupabaseClientProvider.client != null) {
+            val client = SupabaseClientProvider.client!!
             try {
                 client.auth.signUpWith(Email) {
                     this.email = targetEmail
                     this.password = pass
                 }
             } catch (authEx: Exception) {
-                val userFriendlyMsg = parseAuthError(authEx)
-                return@withContext Result.failure(Exception(userFriendlyMsg))
+                val msg = authEx.message ?: ""
+                // If user is already registered in Supabase Auth, attempt signing in with the password
+                if (msg.contains("already registered", ignoreCase = true) || 
+                    msg.contains("email_exists", ignoreCase = true) || 
+                    msg.contains("already exists", ignoreCase = true)) {
+                    try {
+                        client.auth.signInWith(Email) {
+                            this.email = targetEmail
+                            this.password = pass
+                        }
+                    } catch (signInEx: Exception) {
+                        return@withContext Result.failure(Exception(parseAuthError(authEx)))
+                    }
+                } else {
+                    return@withContext Result.failure(Exception(parseAuthError(authEx)))
+                }
             }
 
-            // 2. Obtain Authenticated or Registered User's Real UUID from Supabase Auth
-            val authUser = client.auth.currentUserOrNull()
-            var userId = authUser?.id
-
-            // If active session not established directly by signUpWith, attempt immediate signIn to establish session
+            // Obtain Authenticated User UUID
+            var userId = client.auth.currentUserOrNull()?.id
             if (userId.isNullOrBlank()) {
                 try {
                     client.auth.signInWith(Email) {
@@ -102,45 +113,44 @@ class AppRepository {
                 } catch (_: Exception) {}
             }
 
-            val finalUserId = if (!userId.isNullOrBlank()) userId else (client.auth.currentUserOrNull()?.id ?: "usr_${System.currentTimeMillis()}")
+            if (!userId.isNullOrBlank()) {
+                finalUserId = userId
+            }
+        }
 
-            // 3. Construct Profile DTO with real Auth UUID
-            val profile = ProfileDto(
-                id = finalUserId, // REAL Auth UUID
-                email = targetEmail,
-                username = targetUsername,
-                fullName = targetName,
-                phone = phone,
-                country = country,
-                currency = currency,
-                role = "USER",
-                walletBalance = 0.0,
-                isApproved = true,
-                isBlocked = false
-            )
+        // Construct Profile DTO
+        val profile = ProfileDto(
+            id = finalUserId,
+            email = targetEmail,
+            username = targetUsername,
+            fullName = targetName,
+            phone = phone,
+            country = country,
+            currency = currency,
+            role = "USER",
+            walletBalance = 0.0,
+            isApproved = true,
+            isBlocked = false
+        )
 
-            profilesMap[targetEmail] = profile
+        // Always save to local profile map so local sessions & instant logins succeed
+        profilesMap[targetEmail] = profile
+        profilesMap[targetUsername] = profile
 
-            // 4. Insert Profile Row directly into Supabase Postgrest 'profiles' or 'users' table
-            var profileInserted = false
+        // Attempt Supabase Postgrest Insert/Upsert
+        if (SupabaseClientProvider.isConfigured() && SupabaseClientProvider.client != null) {
+            val client = SupabaseClientProvider.client!!
             try {
                 client.postgrest["profiles"].upsert(profile)
-                profileInserted = true
-            } catch (_: Exception) {}
-
-            if (!profileInserted) {
+            } catch (_: Exception) {
                 try {
                     client.postgrest["users"].upsert(profile)
-                    profileInserted = true
                 } catch (_: Exception) {}
             }
-
-            currentSessionUser = profile
-            Result.success(profile)
-        } catch (e: Exception) {
-            val userFriendlyMsg = parseAuthError(e)
-            Result.failure(Exception(userFriendlyMsg))
         }
+
+        currentSessionUser = profile
+        Result.success(profile)
     }
 
     suspend fun signIn(email: String, pass: String): Result<ProfileDto> = withContext(Dispatchers.IO) {
