@@ -172,21 +172,8 @@ fun AppNavigation(viewModel: MainViewModel, activityIntent: Intent? = null) {
         composable("splash") {
             SplashScreen(
                 onSplashFinished = {
-                    val user = viewModel.currentUser.value
-                    if (user != null) {
-                        if (user.role == "SUPER_ADMIN") {
-                            navController.navigate("admin_dashboard") {
-                                popUpTo("splash") { inclusive = true }
-                            }
-                        } else {
-                            navController.navigate("user_dashboard") {
-                                popUpTo("splash") { inclusive = true }
-                            }
-                        }
-                    } else {
-                        navController.navigate("user_dashboard") {
-                            popUpTo("splash") { inclusive = true }
-                        }
+                    navController.navigate("auth") {
+                        popUpTo("splash") { inclusive = true }
                     }
                 }
             )
