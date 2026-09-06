@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1023683355054",
+    "project_id": "bp-wallet-exchange",
+    "storage_bucket": "bp-wallet-exchange.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1023683355054:android:a1b2c3d4e5f6a7b8c9d0e1",
+        "android_client_info": {
+          "package_name": "com.aistudio.bpexchwallet.kxmpzq"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-placeholder-key-for-fcm-push"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
