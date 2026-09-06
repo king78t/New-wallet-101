@@ -1,10 +1,16 @@
 package com.example
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -21,16 +27,20 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.notifications.NotificationHelper
 import com.example.ui.MainViewModel
 import com.example.ui.screens.AdminSuperPanelScreen
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.BetProWebViewScreen
+import com.example.ui.screens.DepositScreen
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.SplashScreen
 import com.example.ui.screens.UserDashboardScreen
+import com.example.ui.screens.WithdrawalScreen
 import com.example.ui.theme.BPWalletTheme
 
 class MainActivity : ComponentActivity() {
@@ -43,6 +53,23 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             BPWalletTheme {
+                val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { _ -> }
+
+                LaunchedEffect(Unit) {
+                    NotificationHelper.createNotificationChannels(applicationContext)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        if (ContextCompat.checkSelfPermission(
+                                this@MainActivity,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                }
+
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
@@ -65,17 +92,45 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    AppNavigation(viewModel)
+                    AppNavigation(viewModel, intent)
                 }
             }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
 }
 
 @Composable
-fun AppNavigation(viewModel: MainViewModel) {
+fun AppNavigation(viewModel: MainViewModel, activityIntent: Intent? = null) {
     val navController = rememberNavController()
     val isSessionExpired by viewModel.isSessionExpired.collectAsState()
+
+    LaunchedEffect(activityIntent) {
+        val navTarget = activityIntent?.getStringExtra(NotificationHelper.EXTRA_NAV_TARGET)
+        val refId = activityIntent?.getStringExtra(NotificationHelper.EXTRA_REFERENCE_ID)
+        if (!navTarget.isNullOrBlank()) {
+            when {
+                navTarget == "deposit" -> navController.navigate("deposit")
+                navTarget == "withdrawal" -> navController.navigate("withdrawal")
+                navTarget.startsWith("admin_") -> {
+                    val user = viewModel.currentUser.value
+                    val isAdmin = user?.role.equals("SUPER_ADMIN", ignoreCase = true) ||
+                            user?.role.equals("ADMIN", ignoreCase = true)
+                    if (isAdmin) {
+                        viewModel.selectAdminTarget(navTarget, refId)
+                        navController.navigate("admin_dashboard")
+                    } else {
+                        viewModel.pendingAdminDeepLink.value = Pair(navTarget, refId)
+                        navController.navigate("auth")
+                    }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(isSessionExpired) {
         if (isSessionExpired) {
@@ -117,8 +172,21 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable("splash") {
             SplashScreen(
                 onSplashFinished = {
-                    navController.navigate("auth") {
-                        popUpTo("splash") { inclusive = true }
+                    val user = viewModel.currentUser.value
+                    if (user != null) {
+                        if (user.role == "SUPER_ADMIN") {
+                            navController.navigate("admin_dashboard") {
+                                popUpTo("splash") { inclusive = true }
+                            }
+                        } else {
+                            navController.navigate("user_dashboard") {
+                                popUpTo("splash") { inclusive = true }
+                            }
+                        }
+                    } else {
+                        navController.navigate("user_dashboard") {
+                            popUpTo("splash") { inclusive = true }
+                        }
                     }
                 }
             )
@@ -143,6 +211,12 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable("user_dashboard") {
             UserDashboardScreen(
                 viewModel = viewModel,
+                onNavigateToDeposit = {
+                    navController.navigate("deposit")
+                },
+                onNavigateToWithdrawal = {
+                    navController.navigate("withdrawal")
+                },
                 onOpenBetProExchange = {
                     navController.navigate("betpro_webview")
                 },
@@ -154,6 +228,24 @@ fun AppNavigation(viewModel: MainViewModel) {
                     navController.navigate("auth") {
                         popUpTo("user_dashboard") { inclusive = true }
                     }
+                }
+            )
+        }
+
+        composable("deposit") {
+            DepositScreen(
+                viewModel = viewModel,
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable("withdrawal") {
+            WithdrawalScreen(
+                viewModel = viewModel,
+                onBack = {
+                    navController.popBackStack()
                 }
             )
         }

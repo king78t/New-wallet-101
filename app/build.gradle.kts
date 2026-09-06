@@ -5,6 +5,7 @@ plugins {
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
+  alias(libs.plugins.google.services)
 }
 
 fun getSecretValue(key: String): String {
@@ -137,6 +138,8 @@ dependencies {
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
   // implementation(libs.play.services.location)
+  implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.messaging)
   implementation(platform(libs.supabase.bom))
   implementation(libs.supabase.gotrue)
   implementation(libs.supabase.postgrest)

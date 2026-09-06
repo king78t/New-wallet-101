@@ -6,9 +6,15 @@ import android.net.Uri
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +24,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -73,6 +80,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -101,8 +110,183 @@ private fun uriToBase64(context: Context, uri: Uri): String? {
 }
 
 @Composable
+private fun Interactive3DActionButton(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    gradientColors: List<Color>,
+    baseDepthColor: Color,
+    borderHighlightColor: Color,
+    iconBadgeColor: Color,
+    iconTintColor: Color,
+    subtitleColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    // Dynamic spring-based vertical press down displacement
+    val offsetY by animateDpAsState(
+        targetValue = if (isPressed) 4.dp else 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "pressOffsetY"
+    )
+
+    // Dynamic tactile scale compression
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.975f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "pressScale"
+    )
+
+    // Dynamic shadow elevation collapse on press
+    val shadowElevation by animateDpAsState(
+        targetValue = if (isPressed) 2.dp else 8.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "shadowElevation"
+    )
+
+    Box(
+        modifier = modifier
+            .height(64.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+    ) {
+        // 3D Bottom Depth Shelf (Bevel base that anchors the button)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(58.dp)
+                .align(Alignment.BottomCenter)
+                .clip(RoundedCornerShape(18.dp))
+                .background(baseDepthColor)
+        )
+
+        // 3D Elevated Front Surface with spring-based press-down feedback
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .align(Alignment.TopCenter)
+                .offset(y = offsetY)
+                .shadow(
+                    elevation = shadowElevation,
+                    shape = RoundedCornerShape(18.dp),
+                    ambientColor = baseDepthColor.copy(alpha = 0.55f),
+                    spotColor = baseDepthColor.copy(alpha = 0.55f)
+                )
+                .clip(RoundedCornerShape(18.dp))
+                .background(
+                    brush = Brush.verticalGradient(colors = gradientColors)
+                )
+                .border(
+                    width = 1.2.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            borderHighlightColor,
+                            Color.White.copy(alpha = 0.08f)
+                        )
+                    ),
+                    shape = RoundedCornerShape(18.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            // Top Specular Glass Reflection
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(26.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = if (isPressed) 0.15f else 0.30f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                // 3D Circular Embossed Pod
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .shadow(if (isPressed) 1.dp else 3.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    iconBadgeColor.copy(alpha = 0.35f),
+                                    iconBadgeColor.copy(alpha = 0.10f)
+                                )
+                            )
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = iconBadgeColor.copy(alpha = 0.65f),
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = title,
+                        tint = iconTintColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Column {
+                    Text(
+                        text = title,
+                        color = Color.White,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.6.sp
+                    )
+                    Text(
+                        text = subtitle,
+                        color = subtitleColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun UserDashboardScreen(
     viewModel: MainViewModel,
+    onNavigateToDeposit: () -> Unit = {},
+    onNavigateToWithdrawal: () -> Unit = {},
     onOpenBetProExchange: () -> Unit,
     onOpenProfile: () -> Unit = {},
     onLogout: () -> Unit
@@ -112,9 +296,9 @@ fun UserDashboardScreen(
     val userSession by viewModel.currentUser.collectAsState()
     val paymentGateways by viewModel.paymentGateways.collectAsState()
     val transactions by viewModel.userTransactions.collectAsState()
+    val isBetproEnabled by viewModel.isBetproEnabled.collectAsState()
+    val betproDisplayName by viewModel.betproDisplayName.collectAsState()
 
-    var showDepositModal by remember { mutableStateOf(false) }
-    var showWithdrawModal by remember { mutableStateOf(false) }
     var showTransferModal by remember { mutableStateOf(false) }
     var showHistoryModal by remember { mutableStateOf(false) }
     var isFabExpanded by remember { mutableStateOf(false) }
@@ -248,114 +432,46 @@ fun UserDashboardScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // TOP QUICK ACTIONS: PROMINENT DEPOSIT & WITHDRAWAL BUTTONS (PREMIUM WALLET STYLE)
+                // TOP QUICK ACTIONS: 3D PREMIUM DEPOSIT & WITHDRAWAL BUTTONS WITH SPRING-BASED FEEDBACK
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // DEPOSIT BUTTON
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp)
-                            .shadow(6.dp, RoundedCornerShape(16.dp), ambientColor = Color(0x4010B981), spotColor = Color(0x4010B981))
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(Color(0xFF10B981), Color(0xFF059669))
-                                )
-                            )
-                            .clickable { showDepositModal = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = "Deposit",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = "DEPOSIT",
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = 0.5.sp
-                                )
-                                Text(
-                                    text = currency,
-                                    color = Color.White.copy(alpha = 0.85f),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
+                    Interactive3DActionButton(
+                        title = "DEPOSIT",
+                        subtitle = "Add Funds ($currency)",
+                        icon = Icons.Default.Add,
+                        gradientColors = listOf(
+                            Color(0xFF34D399),
+                            Color(0xFF10B981),
+                            Color(0xFF059669)
+                        ),
+                        baseDepthColor = Color(0xFF047857),
+                        borderHighlightColor = Color.White.copy(alpha = 0.55f),
+                        iconBadgeColor = Color.White,
+                        iconTintColor = Color.White,
+                        subtitleColor = Color.White.copy(alpha = 0.9f),
+                        onClick = onNavigateToDeposit,
+                        modifier = Modifier.weight(1f)
+                    )
 
-                    // WITHDRAWAL BUTTON
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp)
-                            .shadow(6.dp, RoundedCornerShape(16.dp), ambientColor = Color(0x400F172A), spotColor = Color(0x400F172A))
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(Color(0xFF1E293B), Color(0xFF0F172A))
-                                )
-                            )
-                            .clickable { showWithdrawModal = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Remove,
-                                    contentDescription = "Withdrawal",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = "WITHDRAWAL",
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = 0.5.sp
-                                )
-                                Text(
-                                    text = currency,
-                                    color = Color.White.copy(alpha = 0.85f),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
+                    Interactive3DActionButton(
+                        title = "WITHDRAW",
+                        subtitle = "Cash Out ($currency)",
+                        icon = Icons.Default.Remove,
+                        gradientColors = listOf(
+                            Color(0xFF334155),
+                            Color(0xFF1E293B),
+                            Color(0xFF0F172A)
+                        ),
+                        baseDepthColor = Color(0xFF020617),
+                        borderHighlightColor = Color(0xFFF59E0B).copy(alpha = 0.6f),
+                        iconBadgeColor = Color(0xFFF59E0B),
+                        iconTintColor = Color(0xFFFBBF24),
+                        subtitleColor = Color(0xFFFDE68A),
+                        onClick = onNavigateToWithdrawal,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -516,41 +632,6 @@ fun UserDashboardScreen(
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = if (hasCredentials) Color(0xFF92400E) else Color(0xFF1E40AF)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Open Exchange Button
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(46.dp)
-                                .shadow(4.dp, RoundedCornerShape(14.dp), ambientColor = Color(0x3010B981))
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(
-                                    brush = Brush.horizontalGradient(
-                                        colors = listOf(Color(0xFF10B981), Color(0xFF059669))
-                                    )
-                                )
-                                .clickable { onOpenBetProExchange() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "OPEN BETPRO EXCHANGE",
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    letterSpacing = 0.5.sp
                                 )
                             }
                         }
@@ -730,7 +811,7 @@ fun UserDashboardScreen(
                     horizontalArrangement = Arrangement.End,
                     modifier = Modifier.clickable {
                         isFabExpanded = false
-                        showWithdrawModal = true
+                        onNavigateToWithdrawal()
                     }
                 ) {
                     Box(
@@ -771,7 +852,7 @@ fun UserDashboardScreen(
                     horizontalArrangement = Arrangement.End,
                     modifier = Modifier.clickable {
                         isFabExpanded = false
-                        showDepositModal = true
+                        onNavigateToDeposit()
                     }
                 ) {
                     Box(
@@ -873,22 +954,21 @@ fun UserDashboardScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .clickable {
-                            selectedBottomNavTab = 1
-                            showDepositModal = true
+                            onNavigateToDeposit()
                         }
                         .padding(horizontal = 8.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = "Deposit",
-                        tint = if (selectedBottomNavTab == 1) Color(0xFF10B981) else Color(0xFF94A3B8),
+                        tint = Color(0xFF94A3B8),
                         modifier = Modifier.size(22.dp)
                     )
                     Text(
                         text = "Deposit",
                         fontSize = 11.sp,
-                        fontWeight = if (selectedBottomNavTab == 1) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selectedBottomNavTab == 1) Color(0xFF10B981) else Color(0xFF94A3B8)
+                        fontWeight = FontWeight.Normal,
+                        color = Color(0xFF94A3B8)
                     )
                 }
 
@@ -900,10 +980,17 @@ fun UserDashboardScreen(
                         .clip(CircleShape)
                         .background(
                             brush = Brush.radialGradient(
-                                colors = listOf(Color(0xFF22C55E), Color(0xFF059669))
+                                colors = if (isBetproEnabled) listOf(Color(0xFF22C55E), Color(0xFF059669))
+                                         else listOf(Color(0xFF64748B), Color(0xFF475569))
                             )
                         )
-                        .clickable { onOpenBetProExchange() },
+                        .clickable {
+                            if (isBetproEnabled) {
+                                onOpenBetProExchange()
+                            } else {
+                                viewModel.showToast("BetPro exchange is temporarily offline for maintenance.")
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -927,22 +1014,21 @@ fun UserDashboardScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .clickable {
-                            selectedBottomNavTab = 3
-                            showWithdrawModal = true
+                            onNavigateToWithdrawal()
                         }
                         .padding(horizontal = 8.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Remove,
                         contentDescription = "Withdraw",
-                        tint = if (selectedBottomNavTab == 3) Color(0xFF10B981) else Color(0xFF94A3B8),
+                        tint = Color(0xFF94A3B8),
                         modifier = Modifier.size(22.dp)
                     )
                     Text(
                         text = "Withdraw",
                         fontSize = 11.sp,
-                        fontWeight = if (selectedBottomNavTab == 3) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selectedBottomNavTab == 3) Color(0xFF10B981) else Color(0xFF94A3B8)
+                        fontWeight = FontWeight.Normal,
+                        color = Color(0xFF94A3B8)
                     )
                 }
 
@@ -973,21 +1059,6 @@ fun UserDashboardScreen(
         }
     }
 
-    // Modal Deposit Dialog (Matching Image 1)
-    if (showDepositModal) {
-        DepositDialog(
-            userCurrency = currency,
-            gateways = paymentGateways,
-            userTransactions = transactions,
-            onDismiss = { showDepositModal = false },
-            onSubmit = { amount, gwName, accTitle, accNum, sender, ref, screenshotUrl ->
-                viewModel.submitDepositRequest(amount, gwName, accTitle, accNum, sender, ref, screenshotUrl) {
-                    showDepositModal = false
-                }
-            }
-        )
-    }
-
     // Modal Transfer Dialog
     if (showTransferModal) {
         TransferDialog(
@@ -997,22 +1068,6 @@ fun UserDashboardScreen(
             onSubmit = { recipient, amount, remarks ->
                 viewModel.submitTransferRequest(recipient, amount, remarks) {
                     showTransferModal = false
-                }
-            }
-        )
-    }
-
-    // Modal Withdraw Dialog (Matching Image 2)
-    if (showWithdrawModal) {
-        WithdrawDialog(
-            userCurrency = currency,
-            userBalance = userSession?.walletBalance ?: 0.0,
-            gateways = paymentGateways,
-            userTransactions = transactions,
-            onDismiss = { showWithdrawModal = false },
-            onSubmit = { amount, gwName, accTitle, accNum ->
-                viewModel.submitWithdrawalRequest(amount, gwName, accTitle, accNum) {
-                    showWithdrawModal = false
                 }
             }
         )
@@ -1646,7 +1701,6 @@ fun WithdrawDialog(
     var selectedGatewayName by remember { mutableStateOf("JazzCash") }
     var accountTitle by remember { mutableStateOf("") }
     var accountNumber by remember { mutableStateOf("") }
-    var remarksText by remember { mutableStateOf("") }
     var validationError by remember { mutableStateOf<String?>(null) }
 
     val gatewayOptions = listOf("JazzCash", "EasyPaisa", "Meezan Bank", "USDT (TRC20)", "Bank Transfer")
@@ -1734,7 +1788,7 @@ fun WithdrawDialog(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "Bank / wallet",
+                    text = "Bank Name (or wallet name)",
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF334155)
@@ -1774,7 +1828,7 @@ fun WithdrawDialog(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "Account title",
+                    text = "Account Name",
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF334155)
@@ -1786,7 +1840,7 @@ fun WithdrawDialog(
                         accountTitle = it
                         validationError = null
                     },
-                    placeholder = { Text("Enter account title") },
+                    placeholder = { Text("Enter account holder name") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
@@ -1799,7 +1853,7 @@ fun WithdrawDialog(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "Account number / IBAN",
+                    text = "Account Number",
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF334155)
@@ -1812,28 +1866,6 @@ fun WithdrawDialog(
                         validationError = null
                     },
                     placeholder = { Text("Enter account number or IBAN") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF10B981),
-                        unfocusedBorderColor = Color(0xFFE2E8F0)
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = "Remarks (optional)",
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF334155)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                OutlinedTextField(
-                    value = remarksText,
-                    onValueChange = { remarksText = it },
-                    placeholder = { Text("e.g. Urgent payout") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
@@ -1867,10 +1899,12 @@ fun WithdrawDialog(
                             val amt = amountText.toDoubleOrNull()
                             if (amt == null || amt <= 0.0) {
                                 validationError = "Please enter a valid withdrawal amount > 0"
+                            } else if (selectedGatewayName.isBlank()) {
+                                validationError = "Please select Bank Name (or wallet name)"
                             } else if (accountTitle.isBlank()) {
-                                validationError = "Please enter account title"
+                                validationError = "Please enter Account Name"
                             } else if (accountNumber.isBlank()) {
-                                validationError = "Please enter account number or IBAN"
+                                validationError = "Please enter Account Number"
                             } else {
                                 onSubmit(
                                     amt,

@@ -58,5 +58,34 @@ data class SystemSettingsDto(
     @SerialName("whatsapp_helpline") val whatsappHelpline: String = "+923259550448",
     @SerialName("exchange_website_url") val exchangeWebsiteUrl: String = "https://bpexch.live",
     @SerialName("announcement_title") val announcementTitle: String = "",
-    @SerialName("announcement_message") val announcementMessage: String = ""
+    @SerialName("announcement_message") val announcementMessage: String = "",
+    @SerialName("betpro_enabled") val betproEnabled: Boolean = true,
+    @SerialName("betpro_display_name") val betproDisplayName: String = "BetPro Live Exchange"
+)
+
+@Serializable
+data class AdminDeviceDto(
+    @SerialName("device_id") val deviceId: String = "",
+    @SerialName("admin_id") val adminId: String = "",
+    @SerialName("push_token") val pushToken: String = "",
+    @SerialName("platform") val platform: String = "Android",
+    @SerialName("device_name") val deviceName: String = "",
+    @SerialName("created_at") val createdAt: String = "",
+    @SerialName("last_seen_at") val lastSeenAt: String = "",
+    @SerialName("is_active") val isActive: Boolean = true
+)
+
+@Serializable
+data class AdminNotificationDto(
+    @SerialName("id") val id: String = "",
+    @SerialName("type") val type: String = "SYSTEM_ALERT", // "USER_CREATED", "DEPOSIT_CREATED", "WITHDRAWAL_CREATED", "SYSTEM_ALERT"
+    @SerialName("title") val title: String = "",
+    @SerialName("message") val message: String = "",
+    @SerialName("reference_id") val referenceId: String = "", // userId or txId
+    @SerialName("username") val username: String = "",
+    @SerialName("amount") val amount: Double = 0.0,
+    @SerialName("currency") val currency: String = "PKR",
+    @SerialName("gateway_name") val gatewayName: String = "",
+    @SerialName("created_at") val createdAt: String = "",
+    @SerialName("is_read") val isRead: Boolean = false
 )

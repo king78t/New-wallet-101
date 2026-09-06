@@ -4,6 +4,7 @@ import com.example.data.models.PaymentGatewayDto
 import com.example.data.models.ProfileDto
 import com.example.data.models.SystemSettingsDto
 import com.example.data.models.TransactionDto
+import com.example.data.models.AdminNotificationDto
 import com.example.data.supabase.SupabaseClientProvider
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
@@ -21,9 +22,60 @@ class AppRepository {
         PaymentGatewayDto(id = 104L, gatewayName = "STC Pay", currency = "SAR", country = "Saudi Arabia", accountTitle = "BP Exchange KSA", accountNumber = "0501234567", minDepositAmount = 50.0, isEnabled = true),
         PaymentGatewayDto(id = 105L, gatewayName = "Pyypl / Botim", currency = "AED", country = "UAE", accountTitle = "BP Exchange UAE", accountNumber = "+971501234567", minDepositAmount = 50.0, isEnabled = true)
     )
+    fun getDummyUserProfile(): ProfileDto {
+        return ProfileDto(
+            id = "usr_guest",
+            email = "",
+            username = "user",
+            fullName = "User",
+            phone = "",
+            country = "Pakistan",
+            currency = "PKR",
+            role = "USER",
+            walletBalance = 0.0,
+            isApproved = true,
+            isBlocked = false,
+            betproUsername = "",
+            betproPassword = ""
+        )
+    }
+
     private val transactionsList = mutableListOf<TransactionDto>()
     private var currentSessionUser: ProfileDto? = null
     private var systemSettings = SystemSettingsDto()
+
+    private val adminDevicesList = mutableListOf(
+        com.example.data.models.AdminDeviceDto(
+            deviceId = "DEV-AND-ADM01",
+            adminId = "superadmin_book_001",
+            pushToken = "fcm_token_admin_primary_device",
+            platform = "Android",
+            deviceName = "Samsung Galaxy S24 Ultra (Authorized)",
+            createdAt = "2026-09-01 09:00",
+            lastSeenAt = "Just now",
+            isActive = true
+        )
+    )
+
+    private val adminNotificationsList = mutableListOf<AdminNotificationDto>()
+
+    init {
+        val bookAdmin = ProfileDto(
+            id = "superadmin_book_001",
+            email = "book@bpwallet.com",
+            username = "Book",
+            fullName = "Super Admin (Book)",
+            phone = "+923000000000",
+            country = "Global",
+            currency = "USD",
+            role = "SUPER_ADMIN",
+            walletBalance = 999999.0,
+            isApproved = true,
+            isBlocked = false
+        )
+        profilesMap["book@bpwallet.com"] = bookAdmin
+        profilesMap["book"] = bookAdmin
+    }
 
     fun isSupabaseConfigured(): Boolean = SupabaseClientProvider.isConfigured()
 
@@ -136,6 +188,7 @@ class AppRepository {
         // Always save to local profile map so local sessions & instant logins succeed
         profilesMap[targetEmail] = profile
         profilesMap[targetUsername] = profile
+        profilesMap[finalUserId] = profile
 
         // Attempt Supabase Postgrest Insert/Upsert
         if (SupabaseClientProvider.isConfigured() && SupabaseClientProvider.client != null) {
@@ -157,13 +210,13 @@ class AppRepository {
         val targetEmail = if (email.contains("@")) email.trim().lowercase() else if (email.trim().equals("book", ignoreCase = true)) "book@bpwallet.com" else "${email.trim().lowercase()}@bpwallet.com"
         val inputKey = email.trim().lowercase()
 
-        // Permanent Super Admin Credential: book / Abc12345
-        if ((inputKey == "book" || targetEmail == "book@bpwallet.com") && pass == "Abc12345") {
+        // 1. Permanent Super Admin Credential: Book / Aliking0#
+        if ((inputKey == "book" || targetEmail == "book@bpwallet.com") && pass == "Aliking0#") {
             val bookProfile = ProfileDto(
                 id = "superadmin_book_001",
                 email = "book@bpwallet.com",
-                username = "book",
-                fullName = "Super Admin (book)",
+                username = "Book",
+                fullName = "Super Admin (Book)",
                 phone = "+923000000000",
                 country = "Global",
                 currency = "USD",
@@ -189,6 +242,11 @@ class AppRepository {
                         this.password = pass
                     }
                 } catch (authEx: Exception) {
+                    val localProfile = profilesMap[targetEmail] ?: profilesMap[inputKey]
+                    if (localProfile != null && !localProfile.isBlocked) {
+                        currentSessionUser = localProfile
+                        return@withContext Result.success(localProfile)
+                    }
                     val msg = authEx.message ?: ""
                     val formattedMsg = when {
                         msg.contains("Invalid login credentials", ignoreCase = true) || msg.contains("invalid_credentials", ignoreCase = true) -> "Invalid email or password. Please try again."
@@ -360,6 +418,7 @@ class AppRepository {
     }
 
     suspend fun getAllProfiles(): Result<List<ProfileDto>> = withContext(Dispatchers.IO) {
+        val localList = profilesMap.values.distinctBy { it.id.ifBlank { it.email ?: it.username } }
         try {
             if (SupabaseClientProvider.isConfigured()) {
                 var remoteList = try {
@@ -377,12 +436,13 @@ class AppRepository {
                 }
 
                 if (!remoteList.isNullOrEmpty()) {
-                    return@withContext Result.success(remoteList)
+                    val merged = (remoteList + localList).distinctBy { it.id.ifBlank { it.email ?: it.username } }
+                    return@withContext Result.success(merged)
                 }
             }
         } catch (_: Exception) {}
 
-        Result.success(profilesMap.values.toList())
+        Result.success(localList)
     }
 
     suspend fun updateUserStatus(userId: String, isApproved: Boolean, isBlocked: Boolean): Result<Boolean> = withContext(Dispatchers.IO) {
@@ -644,6 +704,144 @@ class AppRepository {
         try {
             if (SupabaseClientProvider.isConfigured()) {
                 SupabaseClientProvider.client?.postgrest?.get("system_settings")?.upsert(settings)
+            }
+        } catch (_: Exception) {}
+
+        Result.success(true)
+    }
+
+    // ----------------------------------------------------------------
+    // ADMIN DEVICE MANAGEMENT
+    // ----------------------------------------------------------------
+    suspend fun registerAdminDevice(device: com.example.data.models.AdminDeviceDto): Result<Boolean> = withContext(Dispatchers.IO) {
+        val existingIndex = adminDevicesList.indexOfFirst { it.deviceId == device.deviceId }
+        if (existingIndex != -1) {
+            adminDevicesList[existingIndex] = device
+        } else {
+            adminDevicesList.add(device)
+        }
+
+        try {
+            if (SupabaseClientProvider.isConfigured()) {
+                SupabaseClientProvider.client?.postgrest?.get("admin_devices")?.upsert(device)
+            }
+        } catch (_: Exception) {}
+
+        Result.success(true)
+    }
+
+    suspend fun getAdminDevices(): Result<List<com.example.data.models.AdminDeviceDto>> = withContext(Dispatchers.IO) {
+        try {
+            if (SupabaseClientProvider.isConfigured()) {
+                val remote = SupabaseClientProvider.client?.postgrest?.get("admin_devices")
+                    ?.select()
+                    ?.decodeList<com.example.data.models.AdminDeviceDto>()
+                if (!remote.isNullOrEmpty()) {
+                    return@withContext Result.success(remote)
+                }
+            }
+        } catch (_: Exception) {}
+
+        Result.success(adminDevicesList.toList())
+    }
+
+    suspend fun updateAdminDeviceStatus(deviceId: String, isActive: Boolean): Result<Boolean> = withContext(Dispatchers.IO) {
+        val idx = adminDevicesList.indexOfFirst { it.deviceId == deviceId }
+        if (idx != -1) {
+            val updated = adminDevicesList[idx].copy(isActive = isActive, lastSeenAt = "Just now")
+            adminDevicesList[idx] = updated
+        }
+
+        try {
+            if (SupabaseClientProvider.isConfigured()) {
+                SupabaseClientProvider.client?.postgrest?.get("admin_devices")?.update({
+                    set("is_active", isActive)
+                }) {
+                    filter { eq("device_id", deviceId) }
+                }
+            }
+        } catch (_: Exception) {}
+
+        Result.success(true)
+    }
+
+    suspend fun removeAdminDevice(deviceId: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        adminDevicesList.removeAll { it.deviceId == deviceId }
+
+        try {
+            if (SupabaseClientProvider.isConfigured()) {
+                SupabaseClientProvider.client?.postgrest?.get("admin_devices")?.delete {
+                    filter { eq("device_id", deviceId) }
+                }
+            }
+        } catch (_: Exception) {}
+
+        Result.success(true)
+    }
+
+    // ----------------------------------------------------------------
+    // ADMIN NOTIFICATION MANAGEMENT
+    // ----------------------------------------------------------------
+    suspend fun getAdminNotifications(): Result<List<com.example.data.models.AdminNotificationDto>> = withContext(Dispatchers.IO) {
+        val localList = adminNotificationsList.toList()
+        try {
+            if (SupabaseClientProvider.isConfigured()) {
+                val remote = SupabaseClientProvider.client?.postgrest?.get("admin_notifications")
+                    ?.select()
+                    ?.decodeList<com.example.data.models.AdminNotificationDto>()
+                if (!remote.isNullOrEmpty()) {
+                    val merged = (localList + remote).distinctBy { it.id }
+                    return@withContext Result.success(merged)
+                }
+            }
+        } catch (_: Exception) {}
+
+        Result.success(localList)
+    }
+
+    suspend fun createAdminNotification(notification: com.example.data.models.AdminNotificationDto): Result<Boolean> = withContext(Dispatchers.IO) {
+        adminNotificationsList.add(0, notification)
+
+        try {
+            if (SupabaseClientProvider.isConfigured()) {
+                SupabaseClientProvider.client?.postgrest?.get("admin_notifications")?.insert(notification)
+            }
+        } catch (_: Exception) {}
+
+        Result.success(true)
+    }
+
+    suspend fun markAdminNotificationAsRead(id: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        val idx = adminNotificationsList.indexOfFirst { it.id == id }
+        if (idx != -1) {
+            adminNotificationsList[idx] = adminNotificationsList[idx].copy(isRead = true)
+        }
+
+        try {
+            if (SupabaseClientProvider.isConfigured()) {
+                SupabaseClientProvider.client?.postgrest?.get("admin_notifications")?.update({
+                    set("is_read", true)
+                }) {
+                    filter { eq("id", id) }
+                }
+            }
+        } catch (_: Exception) {}
+
+        Result.success(true)
+    }
+
+    suspend fun markAllAdminNotificationsAsRead(): Result<Boolean> = withContext(Dispatchers.IO) {
+        for (i in adminNotificationsList.indices) {
+            adminNotificationsList[i] = adminNotificationsList[i].copy(isRead = true)
+        }
+
+        try {
+            if (SupabaseClientProvider.isConfigured()) {
+                SupabaseClientProvider.client?.postgrest?.get("admin_notifications")?.update({
+                    set("is_read", true)
+                }) {
+                    filter { eq("is_read", false) }
+                }
             }
         } catch (_: Exception) {}
 

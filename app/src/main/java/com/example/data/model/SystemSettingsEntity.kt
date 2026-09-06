@@ -10,5 +10,7 @@ data class SystemSettingsEntity(
     val whatsappHelpline: String = "+923259550448",
     val exchangeWebsiteUrl: String = "https://bpexch.live",
     val announcementTitle: String = "",
-    val announcementMessage: String = ""
+    val announcementMessage: String = "",
+    val betproEnabled: Boolean = true,
+    val betproDisplayName: String = "BetPro Live Exchange"
 )
