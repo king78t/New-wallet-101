@@ -43,6 +43,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
+import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -215,7 +216,7 @@ fun AdminSuperPanelScreen(
                 drawerState = drawerState,
                 drawerContent = {
                     ModalDrawerSheet(
-                        drawerContainerColor = AdminTheme.SurfaceDark,
+                        drawerContainerColor = Color.White,
                         modifier = Modifier.width(300.dp)
                     ) {
                         Column(
@@ -234,20 +235,20 @@ fun AdminSuperPanelScreen(
                                         modifier = Modifier
                                             .size(36.dp)
                                             .clip(CircleShape)
-                                            .background(AdminTheme.Amber.copy(alpha = 0.2f)),
+                                            .background(Color(0xFFECFDF5)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(imageVector = Icons.Default.Security, contentDescription = null, tint = AdminTheme.Amber, modifier = Modifier.size(20.dp))
+                                        Icon(imageVector = Icons.Default.Security, contentDescription = null, tint = Color(0xFF059669), modifier = Modifier.size(20.dp))
                                     }
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column {
-                                        Text(text = "EXCHANGE ADMIN", color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp)
-                                        Text(text = "Control Center", color = AdminTheme.Emerald, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        Text(text = "BP CONTROL CENTER", color = Color(0xFF0F172A), fontWeight = FontWeight.Black, fontSize = 13.sp)
+                                        Text(text = "Executive Administration", color = Color(0xFF059669), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                     }
                                 }
 
                                 IconButton(onClick = { scope.launch { drawerState.close() } }) {
-                                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = AdminTheme.TextSecondary)
+                                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color(0xFF64748B))
                                 }
                             }
 
@@ -259,7 +260,12 @@ fun AdminSuperPanelScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSelected) AdminTheme.EmeraldDark else Color.Transparent)
+                                        .background(if (isSelected) Color(0xFFECFDF5) else Color.Transparent)
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (isSelected) Color(0xFF059669).copy(alpha = 0.3f) else Color.Transparent,
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
                                         .clickable {
                                             viewModel.activeAdminTab.value = item.id
                                             scope.launch { drawerState.close() }
@@ -272,14 +278,14 @@ fun AdminSuperPanelScreen(
                                         Icon(
                                             imageVector = item.icon,
                                             contentDescription = item.title,
-                                            tint = if (isSelected) Color.White else AdminTheme.TextSecondary,
+                                            tint = if (isSelected) Color(0xFF059669) else Color(0xFF64748B),
                                             modifier = Modifier.size(20.dp)
                                         )
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Text(
                                             text = item.title,
-                                            color = if (isSelected) Color.White else AdminTheme.TextSecondary,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) Color(0xFF059669) else Color(0xFF334155),
+                                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
                                             fontSize = 14.sp
                                         )
                                     }
@@ -288,12 +294,12 @@ fun AdminSuperPanelScreen(
                                         Box(
                                             modifier = Modifier
                                                 .clip(CircleShape)
-                                                .background(AdminTheme.Amber)
+                                                .background(Color(0xFFF59E0B))
                                                 .padding(horizontal = 7.dp, vertical = 2.dp)
                                         ) {
                                             Text(
                                                 text = "${item.badgeCount}",
-                                                color = Color.Black,
+                                                color = Color.White,
                                                 fontWeight = FontWeight.Black,
                                                 fontSize = 11.sp
                                             )
@@ -309,7 +315,8 @@ fun AdminSuperPanelScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(AdminTheme.RedDark.copy(alpha = 0.3f))
+                                    .background(Color(0xFFFEE2E2))
+                                    .border(1.dp, Color(0xFFFCA5A5), RoundedCornerShape(10.dp))
                                     .clickable {
                                         viewModel.logout()
                                         onLogout()
@@ -317,9 +324,9 @@ fun AdminSuperPanelScreen(
                                     .padding(14.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(imageVector = Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = AdminTheme.Red, modifier = Modifier.size(20.dp))
+                                Icon(imageVector = Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = Color(0xFFDC2626), modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Text("Log Out Admin", color = AdminTheme.Red, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Log Out Admin", color = Color(0xFFDC2626), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             }
                         }
                     }
@@ -357,9 +364,10 @@ fun AdminSuperPanelScreen(
                             val isSelected = activeTab == item.id
                             Box(
                                 modifier = Modifier
+                                    .shadow(if (isSelected) 2.dp else 0.dp, RoundedCornerShape(10.dp))
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) AdminTheme.Emerald else AdminTheme.SurfaceDark)
-                                    .border(1.dp, if (isSelected) AdminTheme.Emerald else AdminTheme.BorderSubtle, RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) Color(0xFF059669) else Color.White)
+                                    .border(1.dp, if (isSelected) Color(0xFF059669) else Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
                                     .clickable { viewModel.activeAdminTab.value = item.id }
                                     .padding(horizontal = 12.dp, vertical = 8.dp)
                             ) {
@@ -367,27 +375,27 @@ fun AdminSuperPanelScreen(
                                     Icon(
                                         imageVector = item.icon,
                                         contentDescription = null,
-                                        tint = if (isSelected) Color.White else AdminTheme.TextSecondary,
+                                        tint = if (isSelected) Color.White else Color(0xFF64748B),
                                         modifier = Modifier.size(15.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = item.title,
-                                        color = if (isSelected) Color.White else AdminTheme.TextSecondary,
+                                        color = if (isSelected) Color.White else Color(0xFF334155),
                                         fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
                                     )
                                     if (item.badgeCount > 0) {
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Box(
                                             modifier = Modifier
                                                 .clip(CircleShape)
-                                                .background(if (isSelected) Color.White else AdminTheme.Amber)
+                                                .background(if (isSelected) Color.White else Color(0xFFF59E0B))
                                                 .padding(horizontal = 5.dp, vertical = 1.dp)
                                         ) {
                                             Text(
                                                 text = "${item.badgeCount}",
-                                                color = Color.Black,
+                                                color = if (isSelected) Color(0xFF059669) else Color.White,
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Black
                                             )
@@ -439,10 +447,10 @@ private fun AdminTopBar(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(AdminTheme.SurfaceDark)
-                        .border(1.dp, AdminTheme.BorderSubtle, RoundedCornerShape(10.dp))
+                        .background(Color.White)
+                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
                 ) {
-                    Icon(imageVector = Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                    Icon(imageVector = Icons.Default.Menu, contentDescription = "Menu", tint = Color(0xFF0F172A))
                 }
                 Spacer(modifier = Modifier.width(10.dp))
             }
@@ -450,16 +458,16 @@ private fun AdminTopBar(
             Column {
                 Text(
                     text = "BP CONTROL CENTER",
-                    color = AdminTheme.Amber,
+                    color = Color(0xFF0F172A),
                     fontWeight = FontWeight.Black,
-                    fontSize = 11.sp,
+                    fontSize = 14.sp,
                     letterSpacing = 0.5.sp
                 )
                 Text(
-                    text = title.uppercase(),
-                    color = Color.White,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 17.sp
+                    text = "Administration & Transaction Management",
+                    color = Color(0xFF64748B),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 11.5.sp
                 )
             }
         }
@@ -470,15 +478,15 @@ private fun AdminTopBar(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(AdminTheme.SurfaceDark)
-                    .border(1.dp, AdminTheme.BorderSubtle, RoundedCornerShape(10.dp))
+                    .background(Color.White)
+                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
                     .clickable { onOpenNotifications() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Notifications,
                     contentDescription = "Notifications",
-                    tint = if (unreadCount > 0) AdminTheme.Amber else AdminTheme.TextSecondary,
+                    tint = if (unreadCount > 0) Color(0xFFD97706) else Color(0xFF64748B),
                     modifier = Modifier.size(20.dp)
                 )
                 if (unreadCount > 0) {
@@ -488,7 +496,44 @@ private fun AdminTopBar(
                             .padding(4.dp)
                             .size(8.dp)
                             .clip(CircleShape)
-                            .background(AdminTheme.Amber)
+                            .background(Color(0xFFDC2626))
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Admin Profile Chip
+            Box(
+                modifier = Modifier
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.White)
+                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF059669)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "A",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Admin",
+                        color = Color(0xFF0F172A),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -501,10 +546,10 @@ private fun AdminTopBar(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(AdminTheme.SurfaceDark)
-                    .border(1.dp, AdminTheme.BorderSubtle, RoundedCornerShape(10.dp))
+                    .background(Color.White)
+                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
             ) {
-                Icon(imageVector = Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Logout", tint = AdminTheme.Red, modifier = Modifier.size(20.dp))
+                Icon(imageVector = Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Logout", tint = Color(0xFFDC2626), modifier = Modifier.size(20.dp))
             }
         }
     }

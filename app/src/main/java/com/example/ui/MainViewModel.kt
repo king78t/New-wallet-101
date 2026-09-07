@@ -8,6 +8,8 @@ import com.example.data.models.ProfileDto
 import com.example.data.models.SystemSettingsDto
 import com.example.data.models.TransactionDto
 import com.example.data.repository.AppRepository
+import com.example.data.repository.PaymentProofManager
+import com.example.data.repository.PaymentProofUploadData
 import com.example.notifications.FcmTokenManager
 import com.example.notifications.NotificationHelper
 import com.example.ui.validation.ValidationUtils
@@ -636,27 +638,53 @@ class MainViewModel @JvmOverloads constructor(
         senderName: String,
         txRef: String,
         screenshotUrl: String? = null,
+        paymentProofData: PaymentProofUploadData? = null,
         onSuccess: () -> Unit
     ) {
         val user = _currentUser.value ?: return
-        val txId = "DEP-" + System.currentTimeMillis()
-        val tx = TransactionDto(
-            id = txId,
-            userId = user.id,
-            userName = user.fullName.ifBlank { user.username.ifBlank { user.email } },
-            type = "DEPOSIT",
-            amount = amount,
-            currency = user.currency,
-            gatewayName = gatewayName,
-            accountTitle = accountTitle,
-            accountNumber = accountNumber,
-            senderName = senderName,
-            transactionRef = txRef,
-            screenshotUrl = screenshotUrl,
-            status = "PENDING"
-        )
+        val txId = if (txRef.isNotBlank() && txRef.startsWith("DEP-")) txRef else "DEP-" + System.currentTimeMillis()
 
         viewModelScope.launch {
+            val canonicalPath = PaymentProofManager.canonicalStoragePath(txId)
+            var finalScreenshotUrl: String? = null
+            var finalProofPath: String? = null
+
+            // If we have upload data, upload to private Supabase Storage
+            if (paymentProofData != null) {
+                finalProofPath = paymentProofData.storagePath
+                PaymentProofManager.uploadToSupabase(paymentProofData, txId)
+                // Persistent Storage object path in private bucket
+                finalScreenshotUrl = canonicalPath
+            } else if (!screenshotUrl.isNullOrBlank()) {
+                // Ensure no local file:// or blob: leak into persistent database
+                if (screenshotUrl.startsWith("file://") || screenshotUrl.startsWith("blob:") || screenshotUrl.startsWith("/data/")) {
+                    finalScreenshotUrl = canonicalPath
+                    finalProofPath = "deposits/${txId}.jpg"
+                } else {
+                    finalScreenshotUrl = screenshotUrl
+                    finalProofPath = if (screenshotUrl.startsWith("payment-proofs/")) {
+                        screenshotUrl.removePrefix("payment-proofs/")
+                    } else "deposits/${txId}.jpg"
+                }
+            }
+
+            val tx = TransactionDto(
+                id = txId,
+                userId = user.id,
+                userName = user.fullName.ifBlank { user.username.ifBlank { user.email } },
+                type = "DEPOSIT",
+                amount = amount,
+                currency = user.currency,
+                gatewayName = gatewayName,
+                accountTitle = accountTitle,
+                accountNumber = accountNumber,
+                senderName = senderName,
+                transactionRef = txRef,
+                screenshotUrl = finalScreenshotUrl,
+                paymentProofPath = finalProofPath,
+                status = "PENDING"
+            )
+
             val res = repository.createTransaction(tx)
             if (res.isSuccess) {
                 notifyAdminNewDeposit(tx)

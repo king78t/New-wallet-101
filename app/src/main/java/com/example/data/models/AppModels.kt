@@ -47,6 +47,7 @@ data class TransactionDto(
     @SerialName("sender_name") val senderName: String = "",
     @SerialName("transaction_ref") val transactionRef: String = "",
     @SerialName("screenshot_url") val screenshotUrl: String? = null,
+    @SerialName("payment_proof_path") val paymentProofPath: String? = null,
     @SerialName("status") val status: String = "PENDING",
     @SerialName("created_at") val createdAt: String? = null
 )

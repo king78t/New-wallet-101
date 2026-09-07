@@ -144,6 +144,7 @@ dependencies {
   implementation(libs.supabase.gotrue)
   implementation(libs.supabase.postgrest)
   implementation(libs.supabase.realtime)
+  implementation(libs.supabase.storage)
   implementation(libs.ktor.client.okhttp)
   implementation(libs.ktor.client.core)
   implementation(libs.retrofit)

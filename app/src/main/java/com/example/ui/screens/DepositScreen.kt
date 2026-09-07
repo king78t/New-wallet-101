@@ -59,6 +59,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,6 +74,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.data.repository.PaymentProofManager
+import com.example.data.repository.PaymentProofUploadData
+import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.models.PaymentGatewayDto
@@ -124,17 +128,26 @@ fun DepositScreen(
     var validationError by remember { mutableStateOf<String?>(null) }
     var isSubmitting by remember { mutableStateOf(false) }
     var submitSuccessMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    var paymentProofUploadData by remember { mutableStateOf<PaymentProofUploadData?>(null) }
+    var pendingTxId by remember { mutableStateOf("DEP-" + System.currentTimeMillis() + "-" + (1000..9999).random()) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            val base64 = uriToBase64(context, uri)
-            if (base64 != null) {
-                screenshotBase64 = base64
-                validationError = null
-            } else {
-                screenshotBase64 = uri.toString()
+            scope.launch {
+                val provisionalId = "DEP-" + System.currentTimeMillis() + "-" + (1000..9999).random()
+                pendingTxId = provisionalId
+                val uploadData = PaymentProofManager.processAndSaveProof(context, uri, provisionalId)
+                if (uploadData != null) {
+                    paymentProofUploadData = uploadData
+                    screenshotBase64 = uploadData.base64Thumbnail
+                    validationError = null
+                } else {
+                    val base64 = uriToBase64(context, uri)
+                    screenshotBase64 = base64 ?: uri.toString()
+                }
             }
         }
     }
@@ -690,20 +703,23 @@ fun DepositScreen(
                                 } else {
                                     isSubmitting = true
                                     validationError = null
-                                    val autoRef = "DEP-" + System.currentTimeMillis().toString().takeLast(8)
+                                    val finalRef = if (pendingTxId.isNotBlank()) pendingTxId else "DEP-" + System.currentTimeMillis()
                                     viewModel.submitDepositRequest(
                                         amount = amt,
                                         gatewayName = selectedGateway.gatewayName,
                                         accountTitle = selectedGateway.accountTitle,
                                         accountNumber = selectedGateway.accountNumber,
                                         senderName = senderName.ifBlank { "User" },
-                                        txRef = autoRef,
+                                        txRef = finalRef,
                                         screenshotUrl = screenshotBase64,
+                                        paymentProofData = paymentProofUploadData,
                                         onSuccess = {
                                             isSubmitting = false
                                             submitSuccessMessage = "Deposit request for $currency $amt submitted successfully!"
                                             amountText = ""
                                             screenshotBase64 = null
+                                            paymentProofUploadData = null
+                                            pendingTxId = "DEP-" + System.currentTimeMillis() + "-" + (1000..9999).random()
                                         }
                                     )
                                 }
