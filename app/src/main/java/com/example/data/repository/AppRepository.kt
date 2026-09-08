@@ -5,6 +5,8 @@ import com.example.data.models.ProfileDto
 import com.example.data.models.SystemSettingsDto
 import com.example.data.models.TransactionDto
 import com.example.data.models.AdminNotificationDto
+import com.example.data.model.UserEntity
+import com.example.data.local.UserDao
 import com.example.data.supabase.SupabaseClientProvider
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
@@ -12,7 +14,7 @@ import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class AppRepository {
+class AppRepository(private val userDao: UserDao? = null) {
 
     private val profilesMap = mutableMapOf<String, ProfileDto>()
     private val paymentGatewaysList = mutableListOf(
@@ -58,6 +60,40 @@ class AppRepository {
     )
 
     private val adminNotificationsList = mutableListOf<AdminNotificationDto>()
+
+    // Room Database Mappers
+    private fun UserEntity.toProfileDto(): ProfileDto = ProfileDto(
+        id = this.id,
+        email = this.email,
+        username = this.username,
+        fullName = this.fullName,
+        phone = this.phone,
+        country = this.country,
+        currency = this.currency,
+        role = this.role,
+        walletBalance = this.walletBalance,
+        isApproved = this.isApproved,
+        isBlocked = this.isBlocked,
+        betproUsername = this.betProUsername,
+        betproPassword = this.betProPassword
+    )
+
+    private fun ProfileDto.toUserEntity(password: String = ""): UserEntity = UserEntity(
+        id = this.id.ifBlank { "usr_${System.currentTimeMillis()}" },
+        email = this.email ?: "",
+        password = password,
+        username = this.username ?: "",
+        fullName = this.fullName ?: "",
+        phone = this.phone ?: "",
+        country = this.country ?: "Pakistan",
+        currency = this.currency ?: "PKR",
+        role = this.role,
+        isApproved = this.isApproved,
+        isBlocked = this.isBlocked,
+        walletBalance = this.walletBalance,
+        betProUsername = this.betproUsername ?: "",
+        betProPassword = this.betproPassword ?: ""
+    )
 
     init {
         val bookAdmin = ProfileDto(
@@ -190,6 +226,10 @@ class AppRepository {
         profilesMap[targetUsername] = profile
         profilesMap[finalUserId] = profile
 
+        // Save to Room Database for persistence
+        val userEntity = profile.toUserEntity(password = pass)
+        userDao?.insertUser(userEntity)
+
         // Attempt Supabase Postgrest Insert/Upsert
         if (SupabaseClientProvider.isConfigured() && SupabaseClientProvider.client != null) {
             val client = SupabaseClientProvider.client!!
@@ -229,6 +269,18 @@ class AppRepository {
             profilesMap["book"] = bookProfile
             currentSessionUser = bookProfile
             return@withContext Result.success(bookProfile)
+        }
+
+        // 2. Check Room Database first for persisted users
+        val localUser = userDao?.getUserByEmail(targetEmail)
+        if (localUser != null && localUser.password == pass) {
+            if (localUser.isBlocked) {
+                return@withContext Result.failure(Exception("Your account has been suspended by Super Admin."))
+            }
+            val profile = localUser.toProfileDto()
+            profilesMap[targetEmail] = profile
+            currentSessionUser = profile
+            return@withContext Result.success(profile)
         }
 
         try {
@@ -312,6 +364,9 @@ class AppRepository {
                     }
                     profilesMap[targetEmail] = remoteProfile
                     currentSessionUser = remoteProfile
+                    try {
+                        userDao?.insertUser(remoteProfile.toUserEntity(password = pass))
+                    } catch (_: Exception) {}
                     return@withContext Result.success(remoteProfile)
                 } else if (userId != null) {
                     // Fail-safe: Create default profile row if auth exists but profile row is absent
@@ -330,6 +385,9 @@ class AppRepository {
                     } catch (_: Exception) {}
                     profilesMap[targetEmail] = newProfile
                     currentSessionUser = newProfile
+                    try {
+                        userDao?.insertUser(newProfile.toUserEntity(password = pass))
+                    } catch (_: Exception) {}
                     return@withContext Result.success(newProfile)
                 }
             }
@@ -404,6 +462,9 @@ class AppRepository {
         }
         currentSessionUser = profile
 
+        // Save to Room Database
+        userDao?.insertUser(profile.toUserEntity(password = ""))
+
         try {
             if (SupabaseClientProvider.isConfigured()) {
                 try {
@@ -418,7 +479,8 @@ class AppRepository {
     }
 
     suspend fun getAllProfiles(): Result<List<ProfileDto>> = withContext(Dispatchers.IO) {
-        val localList = profilesMap.values.distinctBy { it.id.ifBlank { it.email ?: it.username } }
+        val roomUsers = userDao?.getAllUsersList()?.map { it.toProfileDto() } ?: emptyList()
+        val localList = (profilesMap.values + roomUsers).distinctBy { it.id.ifBlank { it.email ?: it.username } }
         try {
             if (SupabaseClientProvider.isConfigured()) {
                 var remoteList = try {
@@ -436,6 +498,10 @@ class AppRepository {
                 }
 
                 if (!remoteList.isNullOrEmpty()) {
+                    // Save remote users to Room for offline persistence
+                    remoteList.forEach { profile ->
+                        userDao?.insertUser(profile.toUserEntity(password = ""))
+                    }
                     val merged = (remoteList + localList).distinctBy { it.id.ifBlank { it.email ?: it.username } }
                     return@withContext Result.success(merged)
                 }
@@ -454,6 +520,9 @@ class AppRepository {
                 currentSessionUser = updated
             }
         }
+
+        // Update Room Database
+        userDao?.updateUserStatus(userId, isApproved, isBlocked)
 
         try {
             if (SupabaseClientProvider.isConfigured()) {
@@ -490,6 +559,9 @@ class AppRepository {
             }
         }
 
+        // Update Room Database
+        userDao?.setWalletBalance(userId, newBalance)
+
         try {
             if (SupabaseClientProvider.isConfigured()) {
                 try {
@@ -514,6 +586,10 @@ class AppRepository {
     }
 
     suspend fun updateUserBetproCredentials(userId: String, username: String, password: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            userDao?.updateBetProCredentials(userId, username, password, "ACTIVE ID")
+        } catch (_: Exception) {}
+
         val profile = profilesMap.values.find { it.id == userId }
         if (profile != null && !profile.email.isNullOrBlank()) {
             val updated = profile.copy(betproUsername = username, betproPassword = password)

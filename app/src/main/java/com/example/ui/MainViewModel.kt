@@ -3,6 +3,7 @@ package com.example.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.local.AppDatabase
 import com.example.data.models.PaymentGatewayDto
 import com.example.data.models.ProfileDto
 import com.example.data.models.SystemSettingsDto
@@ -38,7 +39,9 @@ data class UserSession(
 
 class MainViewModel @JvmOverloads constructor(
     application: Application,
-    val repository: AppRepository = AppRepository()
+    val repository: AppRepository = AppRepository(
+        userDao = AppDatabase.getDatabase(application).userDao()
+    )
 ) : AndroidViewModel(application) {
 
     // FCM Push Notification Token

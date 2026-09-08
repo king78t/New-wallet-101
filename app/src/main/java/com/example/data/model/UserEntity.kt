@@ -5,19 +5,22 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "users")
 data class UserEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @PrimaryKey val id: String,
     val email: String,
-    val password: String,
-    val fullName: String,
+    val password: String = "",
+    val username: String = "",
+    val fullName: String = "",
+    val phone: String = "",
     val country: String = "Pakistan",
     val currency: String = "PKR",
     val whatsapp: String = "",
-    val role: String = "USER", // "USER" or "ADMIN"
+    val role: String = "USER",
     val isApproved: Boolean = true,
     val isBlocked: Boolean = false,
     val walletBalance: Double = 0.0,
     val betProUsername: String = "",
     val betProPassword: String = "",
-    val betProStatus: String = "ACTIVE ID", // "ACTIVE ID", "PENDING", "BLOCKED"
-    val masterAgentName: String = "Pakistan Super Master"
+    val betProStatus: String = "ACTIVE ID",
+    val masterAgentName: String = "Pakistan Super Master",
+    val createdAt: Long = System.currentTimeMillis()
 )
