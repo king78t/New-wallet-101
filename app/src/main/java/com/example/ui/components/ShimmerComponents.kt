@@ -310,3 +310,281 @@ fun ShimmerCountrySelector(
         }
     }
 }
+
+/**
+ * Shimmer placeholder for the User Dashboard profile header bar while user session is loading.
+ */
+@Composable
+fun ShimmerProfileHeader(
+    modifier: Modifier = Modifier
+) {
+    val brush = shimmerBrush(durationMillis = 1200)
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(4.dp)
+        ) {
+            // Avatar skeleton circle
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(brush)
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column {
+                // Name skeleton line
+                Box(
+                    modifier = Modifier
+                        .width(120.dp)
+                        .height(16.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(brush)
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Handle skeleton line
+                    Box(
+                        modifier = Modifier
+                            .width(65.dp)
+                            .height(12.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(brush)
+                    )
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Currency badge skeleton
+                    Box(
+                        modifier = Modifier
+                            .width(70.dp)
+                            .height(16.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(brush)
+                    )
+                }
+            }
+        }
+
+        // Action icons skeleton
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(brush)
+            )
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(brush)
+            )
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(brush)
+            )
+        }
+    }
+}
+
+/**
+ * Shimmer placeholder for the 3D Wallet Balance Card / Quick Action components while loading.
+ */
+@Composable
+fun ShimmerWalletBalanceCard(
+    modifier: Modifier = Modifier
+) {
+    val brush = shimmerBrush(durationMillis = 1200)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color.White.copy(alpha = 0.85f))
+            .border(
+                width = 1.dp,
+                color = Color(0xFFE2E8F0),
+                shape = RoundedCornerShape(22.dp)
+            )
+            .shadow(
+                elevation = 4.dp,
+                shape = RoundedCornerShape(22.dp),
+                ambientColor = Color(0x15000000)
+            )
+            .padding(18.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(brush)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(100.dp)
+                            .height(14.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(brush)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .width(70.dp)
+                        .height(20.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(brush)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Balance number skeleton
+            Box(
+                modifier = Modifier
+                    .width(180.dp)
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(brush)
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Quick action skeleton buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(brush)
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(brush)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Shimmer placeholder for Profile Screen Header Card while user session is loading.
+ */
+@Composable
+fun ShimmerProfileDetailsCard(
+    modifier: Modifier = Modifier
+) {
+    val brush = shimmerBrush(durationMillis = 1200)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color.White)
+            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(24.dp))
+            .padding(20.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Avatar Box skeleton
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(CircleShape)
+                    .background(brush)
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column {
+                Box(
+                    modifier = Modifier
+                        .width(140.dp)
+                        .height(20.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(brush)
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Box(
+                    modifier = Modifier
+                        .width(180.dp)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(brush)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Box(
+                    modifier = Modifier
+                        .width(110.dp)
+                        .height(22.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(brush)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Shimmer placeholder for small Wallet Balance chips (e.g. Deposit screen header).
+ */
+@Composable
+fun ShimmerBalanceChip(
+    modifier: Modifier = Modifier
+) {
+    val brush = shimmerBrush(durationMillis = 1100)
+
+    Box(
+        modifier = modifier
+            .width(80.dp)
+            .height(28.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFFECFDF5))
+            .border(1.dp, Color(0xFFA7F3D0), RoundedCornerShape(12.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(14.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(brush)
+        )
+    }
+}
+

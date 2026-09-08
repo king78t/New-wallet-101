@@ -97,6 +97,8 @@ import com.example.data.models.PaymentGatewayDto
 import com.example.data.models.TransactionDto
 import com.example.ui.MainViewModel
 import com.example.ui.components.AnimatedGlassBackground
+import com.example.ui.components.ShimmerProfileHeader
+import com.example.ui.components.ShimmerWalletBalanceCard
 
 private fun uriToBase64(context: Context, uri: Uri): String? {
     return try {
@@ -328,104 +330,108 @@ fun UserDashboardScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 // Header Bar matching video
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                if (userSession == null) {
+                    ShimmerProfileHeader()
+                } else {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { onOpenProfile() }
-                            .padding(4.dp)
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF10B981)),
-                            contentAlignment = Alignment.Center
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onOpenProfile() }
+                                .padding(4.dp)
                         ) {
-                            Text(
-                                text = userName.take(1).uppercase(),
-                                color = Color.White,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Black
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Column {
-                            Text(
-                                text = userName,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF0F172A)
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF10B981)),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text(
-                                    text = userHandle,
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF059669)
+                                    text = userName.take(1).uppercase(),
+                                    color = Color.White,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Black
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0xFFDCFCE7))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
+                            }
+
+                            Spacer(modifier = Modifier.width(10.dp))
+
+                            Column {
+                                Text(
+                                    text = userName,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0F172A)
+                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = "⚡ $currency FIXED",
-                                        fontSize = 9.5.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color(0xFF047857)
+                                        text = userHandle,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF059669)
                                     )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0xFFDCFCE7))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "⚡ $currency FIXED",
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color(0xFF047857)
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { onOpenProfile() }) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Profile",
-                                tint = Color(0xFF10B981)
-                            )
-                        }
-
-                        Box {
-                            IconButton(onClick = { showHistoryModal = true }) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { onOpenProfile() }) {
                                 Icon(
-                                    imageVector = Icons.Default.Notifications,
-                                    contentDescription = "Notifications",
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Profile",
                                     tint = Color(0xFF10B981)
                                 )
                             }
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFEF4444))
-                                    .align(Alignment.TopEnd)
-                            )
-                        }
 
-                        IconButton(onClick = {
-                            viewModel.logout()
-                            onLogout()
-                        }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                                contentDescription = "Logout",
-                                tint = Color(0xFFEF4444)
-                            )
+                            Box {
+                                IconButton(onClick = { showHistoryModal = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Notifications,
+                                        contentDescription = "Notifications",
+                                        tint = Color(0xFF10B981)
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFEF4444))
+                                        .align(Alignment.TopEnd)
+                                    )
+                            }
+
+                            IconButton(onClick = {
+                                viewModel.logout()
+                                onLogout()
+                            }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                    contentDescription = "Logout",
+                                    tint = Color(0xFFEF4444)
+                                )
+                            }
                         }
                     }
                 }
@@ -433,46 +439,51 @@ fun UserDashboardScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // TOP QUICK ACTIONS: 3D PREMIUM DEPOSIT & WITHDRAWAL BUTTONS WITH SPRING-BASED FEEDBACK
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Interactive3DActionButton(
-                        title = "DEPOSIT",
-                        subtitle = "Add Funds ($currency)",
-                        icon = Icons.Default.Add,
-                        gradientColors = listOf(
-                            Color(0xFF34D399),
-                            Color(0xFF10B981),
-                            Color(0xFF059669)
-                        ),
-                        baseDepthColor = Color(0xFF047857),
-                        borderHighlightColor = Color.White.copy(alpha = 0.55f),
-                        iconBadgeColor = Color.White,
-                        iconTintColor = Color.White,
-                        subtitleColor = Color.White.copy(alpha = 0.9f),
-                        onClick = onNavigateToDeposit,
-                        modifier = Modifier.weight(1f)
-                    )
+                if (userSession == null) {
+                    ShimmerWalletBalanceCard()
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Interactive3DActionButton(
+                            title = "DEPOSIT",
+                            subtitle = "Add Funds ($currency)",
+                            icon = Icons.Default.Add,
+                            gradientColors = listOf(
+                                Color(0xFF34D399),
+                                Color(0xFF10B981),
+                                Color(0xFF059669)
+                            ),
+                            baseDepthColor = Color(0xFF047857),
+                            borderHighlightColor = Color.White.copy(alpha = 0.55f),
+                            iconBadgeColor = Color.White,
+                            iconTintColor = Color.White,
+                            subtitleColor = Color.White.copy(alpha = 0.9f),
+                            onClick = onNavigateToDeposit,
+                            modifier = Modifier.weight(1f)
+                        )
 
-                    Interactive3DActionButton(
-                        title = "WITHDRAW",
-                        subtitle = "Cash Out ($currency)",
-                        icon = Icons.Default.Remove,
-                        gradientColors = listOf(
-                            Color(0xFF334155),
-                            Color(0xFF1E293B),
-                            Color(0xFF0F172A)
-                        ),
-                        baseDepthColor = Color(0xFF020617),
-                        borderHighlightColor = Color(0xFFF59E0B).copy(alpha = 0.6f),
-                        iconBadgeColor = Color(0xFFF59E0B),
-                        iconTintColor = Color(0xFFFBBF24),
-                        subtitleColor = Color(0xFFFDE68A),
-                        onClick = onNavigateToWithdrawal,
-                        modifier = Modifier.weight(1f)
-                    )
+                        Interactive3DActionButton(
+                            title = "WITHDRAW",
+                            subtitle = "Cash Out ($currency)",
+                            icon = Icons.Default.Remove,
+                            gradientColors = listOf(
+                                Color(0xFF334155),
+                                Color(0xFF1E293B),
+                                Color(0xFF0F172A)
+                            ),
+                            baseDepthColor = Color(0xFF020617),
+                            borderHighlightColor = Color(0xFFF59E0B).copy(alpha = 0.6f),
+                            iconBadgeColor = Color(0xFFF59E0B),
+                            iconTintColor = Color(0xFFFBBF24),
+                            subtitleColor = Color(0xFFFDE68A),
+                            onClick = onNavigateToWithdrawal,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
+
 
                 Spacer(modifier = Modifier.height(16.dp))
 
